@@ -1,45 +1,40 @@
-# dwm - dynamic window manager
+# Fork of dwm and dmenu, combined
 # See LICENSE file for copyright and license details.
 
 include config.mk
 
-SRC = drw.c dwm.c util.c
+DEPS_SRC = deps/drw.c deps/util.c
+DWM_SRC = wm/dwm.c $(DEPS_SRC)
+DMENU_SRC = menu/dmenu.c $(DEPS_SRC)
+SRC = $(DWM_SRC) $(DMENU_SRC)
 OBJ = ${SRC:.c=.o}
 
-all: dwm
+all: dwm dmenu
 
-.c.o:
-	${CC} -c ${CFLAGS} $<
+%.o: %.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
-${OBJ}: config.h config.mk
+$(OBJ): config.mk
 
-config.h:
-	cp config.def.h $@
+dwm: $(DWM_SRC:.c=.o)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
-dwm: ${OBJ}
-	${CC} -o $@ ${OBJ} ${LDFLAGS}
+dmenu: $(DMENU_SRC:.c=.o)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f dwm ${OBJ} dwm-${VERSION}.tar.gz
-
-dist: clean
-	mkdir -p dwm-${VERSION}
-	cp -R LICENSE Makefile README config.def.h config.mk\
-		dwm.1 drw.h util.h ${SRC} dwm.png transient.c dwm-${VERSION}
-	tar -cf dwm-${VERSION}.tar dwm-${VERSION}
-	gzip dwm-${VERSION}.tar
-	rm -rf dwm-${VERSION}
+	rm -f $(OBJ) dwm dmenu
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -f dwm ${DESTDIR}${PREFIX}/bin
+	cp -f dwm dmenu ./menu/dmenu_run ${DESTDIR}${PREFIX}/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/dwm
-	mkdir -p ${DESTDIR}${MANPREFIX}/man1
-	sed "s/VERSION/${VERSION}/g" < dwm.1 > ${DESTDIR}${MANPREFIX}/man1/dwm.1
-	chmod 644 ${DESTDIR}${MANPREFIX}/man1/dwm.1
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu_run
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/dwm\
-		${DESTDIR}${MANPREFIX}/man1/dwm.1
+		${DESTDIR}${PREFIX}/bin/dmenu\
+		${DESTDIR}${PREFIX}/bin/dmenu_run
 
 .PHONY: all clean dist install uninstall
