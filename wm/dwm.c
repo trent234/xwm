@@ -360,6 +360,16 @@ void
 arrange()
 {
 	showhide(mon->stack);
+	/*
+	strncpy(mon->ltsymbol, mon->lt[mon->sellt]->symbol, sizeof mon->ltsymbol);
+     	if (mon->lt[mon->sellt]->arrange)
+    mon->lt[mon->sellt]->arrange();
+
+	i think this will short circuit the whole different layout thing
+	and just use the tile layout. a precurser to the layout purge
+
+	*/
+	tile();
 	restack();
 }
 
@@ -1189,7 +1199,6 @@ restack()
 void
 run(void)
 {
-	printf("running\n");
 	XEvent ev;
 	/* main event loop */
 	XSync(dpy, False);
