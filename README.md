@@ -14,19 +14,17 @@ Edit `config.mk` to match your local setup (dwm is installed into the /usr/local
 
 Afterwards enter the following command to build and install dwm (if necessary as root):
 
+```
 make clean install
-
-sql
-Copy code
+```
 
 ## Running dwm
 
 Add the following line to your `.xinitrc` to start dwm using `startx`:
 
+```
 exec dwm
-
-bash
-Copy code
+```
 
 In order to display status info in the bar, you can do something like this in your `.xinitrc`:
 
@@ -36,3 +34,4 @@ do
 	sleep 1
 done &
 exec dwm
+```
