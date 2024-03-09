@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <locale.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -66,7 +67,7 @@ enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
-enum {GetClients, SetFocus}; /* socket commands */
+enum {GetClient, SetFocus}; /* socket commands */
 
 typedef union {
 	int i;
@@ -166,7 +167,7 @@ static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusstack(const Arg *arg);
 static Atom getatomprop(Client *c, Atom prop);
-static char* getclients(char *unused); /* param is payload only for socket setters */
+static char* getclient(char *unused); /* param is payload only for socket setters */
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
@@ -235,8 +236,8 @@ static int bh;               /* bar height */
 static int lrpad;            /* sum of left and right padding for text */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
-static void (*shandler[2]) (char *) = {
-	[GetClients] = getclients,
+static char* (*shandler[2]) (char *) = {
+	[GetClient] = getclient,
 	[SetFocus] = setfocus, /* this is an existing function. assuming behavior will need to be modified */
 };
 static void (*xhandler[LASTEvent]) (XEvent *) = {
@@ -662,6 +663,8 @@ static
 void dispatchsocketevent(void){
     int cfd = accept(sockfd, NULL, NULL);
     char buffer[1024] = {0};
+	char *ret = NULL;
+
     read(cfd, buffer, sizeof(buffer));
 
 	/* socket protocol is- request \n payload */
@@ -672,10 +675,11 @@ void dispatchsocketevent(void){
         int sevent = atoi(seventStr); 
         if (sevent >= 0 && sevent < sizeof(shandler)/sizeof(shandler[0])) {
             if (shandler[sevent]) {
-                shandler[sevent](payload);
+                ret = shandler[sevent](payload);
             }
         }
     }
+	write(cfd, ret, strlen(ret));
 	close(cfd);
 }
 
@@ -707,7 +711,7 @@ drawbar()
 		drw_text(drw, x, 0, w, bh, lrpad / 2, tags[i], urg & 1 << i);
 		if (occ & 1 << i)
 		/* Better understand the intent of setting the 6th param*/
-		// selmon == selmon && selmon.sel && selmon.sel->tags & 1 << i,
+		/* selmon == selmon && selmon.sel && selmon.sel->tags & 1 << i, */
 		drw_rect(drw, x + boxs, boxs, boxw, boxw, True, urg & 1 << i);
 		x += w;
 	}
@@ -717,8 +721,8 @@ drawbar()
 
 	if ((w = mon.ww - tw - x) > bh) {
 		if (mon.sel) {
-			// better understand if this is now completely redundant
-			//drw_setscheme(drw, scheme[selmon == selmon ? SchemeSel : SchemeNorm]);
+			/* better understand if this is now completely redundant */
+			/* drw_setscheme(drw, scheme[selmon == selmon ? SchemeSel : SchemeNorm]); */
 			drw_setscheme(drw, scheme[SchemeSel]);
 			drw_text(drw, x, 0, w, bh, lrpad / 2, mon.sel->name, 0);
 			if (mon.sel->isfloating)
@@ -830,28 +834,21 @@ getatomprop(Client *c, Atom prop)
 	return atom;
 }
 
-char* getclients(char *unused) {
-    char *ret;
-	int count = 0;
+char* 
+getclient(char *param) {
+    int index, i = 0;
 
-	if(!mon.clients)
-	 	return '\0';
-    for (Client *c = mon.clients; c != NULL; c = c->next)
-        count++;
-	ret = ecalloc(count, sizeof(mon.clients->name));
+    /* Convert param to integer and check for valid conversion */
+    if (param == NULL || (index = atoi(param)) < 0) 
+		return '\0';
 
-    size_t pos = 0; 
-    for (Client *c = mon.clients; c != NULL; c = c->next) {
-        size_t len = strlen(c->name);
-        strcpy(result + pos, c->name);
-        pos += len;
-        if (c->next != NULL) {
-            strcpy(result + pos, ", ");
-            pos += 2;
+    /* Iterate through clients to find the requested one */
+    for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
+        if (i == index) {
+            return c->name;
         }
     }
-    ret[pos] = '\0';
-    return ret;
+    return '\0';
 }
 
 int
@@ -1256,43 +1253,36 @@ restack()
 
 void run(void) {
     XEvent ev;
-    int xfd, maxfd, cfd;
-    fd_set in_fds;
-    struct timeval tv;
-    char buffer[1024];
-	char* sevent, *payload;
+    int xfd;
+    struct pollfd fds[2];
+    int timeout = 100; // Poll timeout in milliseconds
 
-    // Get the file descriptor of the X server connection
-    xfd = ConnectionNumber(dpy);
+   /* Initialize pollfd structure */
+    fds[0].fd = xfd;
+    fds[0].events = POLLIN; // Check for data to read from X server
+    fds[1].fd = sockfd;
+    fds[1].events = POLLIN; // Check for data to read from socket
 
-    // main event loop
+    /* main event loop */
     XSync(dpy, False);
     while (running) {
-        FD_ZERO(&in_fds);
-        FD_SET(xfd, &in_fds);
-        FD_SET(sockfd, &in_fds);
-
-        // Set maxfd for select
-        maxfd = xfd > sockfd ? xfd : sockfd;
-
-        // Set timeout for select
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000; // 100 ms
-
-        if (select(maxfd + 1, &in_fds, NULL, NULL, &tv) > 0) {
-            if (FD_ISSET(xfd, &in_fds)) {
-                // X server event
-                while (XPending(dpy) && !XNextEvent(dpy, &ev))
-                    if (xhandler[ev.type])
-                        xhandler[ev.type](&ev);
+        /* Poll the set of file descriptors */
+        int num_ready = poll(fds, 2, timeout);
+        if (num_ready > 0) {
+            /* Check for X events without blocking */
+            while (XPending(dpy)) {
+                XNextEvent(dpy, &ev);
+                if (xhandler[ev.type]) {
+                    xhandler[ev.type](&ev);
+                }
             }
-            if (FD_ISSET(sockfd, &in_fds)) {
-				dispatchsocketevent();
-			}
-		}
-	}
+            /* Handle socket event */
+            if (fds[1].revents & POLLIN) {
+                dispatchsocketevent();
+            }
+        }
+    }
 }
-
 
 void
 scan(void)
@@ -1508,30 +1498,30 @@ void
 setupsocket(void) {
     struct sockaddr_un addr;
 
-    // Create a socket
+    /* Create a socket */
     if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) 
         die("socket failed");
 
-    // Set socket to non-blocking
+    /* Set socket to non-blocking */
     int flags = fcntl(sockfd, F_GETFL, 0);
     if (flags < 0) 
         die("fcntl(F_GETFL) failed");
     if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
         die("fcntl(F_SETFL) failed");
 
-    // Remove the socket file if it already exists
+    /* Remove the socket file if it already exists */
     unlink(SOCKET_PATH);
 
-    // Set the socket address
+    /* Set the socket address */
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
-    // Bind the socket to the address
+    /* Bind the socket to the address */
     if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) 
         die("bind failed");
 
-    // Listen for incoming connections
+    /* Listen for incoming connections */
     if (listen(sockfd, SOMAXCONN) < 0) 
         die("listen failed");
 }
