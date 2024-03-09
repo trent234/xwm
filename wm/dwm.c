@@ -1255,6 +1255,8 @@ void run(void) {
     XEvent ev;
     int xfd;
     struct pollfd fds[2];
+
+    int xfd = ConnectionNumber(dpy);
     int timeout = 100; // Poll timeout in milliseconds
 
    /* Initialize pollfd structure */
