@@ -11,11 +11,9 @@
  * in O(1) time.
  *
  * Each child of the root window is called a client, except windows which have
- * set the override_redirect flag. Clients are organized in a linked client list, 
- * the focus history is remembered through a stack list. Each client contains a 
- * bit array to indicate the tags of a client.
+ * set the override_redirect flag. Clients are organized in a linked client list. 
  *
- * Keys and tagging rules are organized as arrays and defined in config.h.
+ * Keys rules are organized as arrays and defined in config.h.
  *
  * To understand everything else, start reading main().
  */
@@ -89,9 +87,8 @@ struct Client {
 	int oldx, oldy, oldw, oldh;
 	int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
 	int bw, oldbw;
-	int isfixed, isfloating, isurgent, neverfocus, oldstate;
+	int isfixed, isfloating, isurgent, neverfocus;
 	Client *next;
-	Client *snext;
 	Window win;
 };
 
@@ -107,7 +104,6 @@ struct Monitor {
 	int mx, my, mw, mh;   /* screen size */
 	int wx, wy, ww, wh;   /* window area  */
 	int showbar;
-	int topbar;
 	Client *clients;
 	Window barwin;
 };
@@ -372,8 +368,8 @@ buttonpress(XEvent *e)
 		else
 			click = ClkWinTitle;
 	} else if ((c = wintoclient(ev->window))) {
-		focus(c);
 		arrange();
+		focus(c);
 		XAllowEvents(dpy, ReplayPointer, CurrentTime);
 		click = ClkClientWin;
 	}
@@ -400,12 +396,12 @@ checkotherwm(void)
 void
 cleanup(void)
 {
-	Arg a = {.ui = ~0};
 	size_t i;
 
 	close(sockfd);
 	while (mon.clients)
 		unmanage(mon.clients, 0);
+	focus(NULL);
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
 	cleanupmon();
 	for (i = 0; i < CurLast; i++)
@@ -434,10 +430,8 @@ clientmessage(XEvent *e)
 
     if (!c)
         return;
-    if (cme->message_type == netatom[NetActiveWindow]) {
-        if (c != mon.clients && !c->isurgent)
-            seturgent(c, 1);
-    }
+    if (cme->message_type == netatom[NetActiveWindow] && c != mon.clients && !c->isurgent)
+        seturgent(c, 1);
 }
 
 void
@@ -462,7 +456,6 @@ configure(Client *c)
 void
 configurenotify(XEvent *e)
 {
-	Client *c;
 	XConfigureEvent *ev = &e->xconfigure;
 	int dirty;
 
@@ -475,8 +468,8 @@ configurenotify(XEvent *e)
 			drw_resize(drw, sw, bh);
 			createbar();
 			XMoveResizeWindow(dpy, mon.barwin, mon.wx, mon.by, mon.ww, bh);
-			focus(NULL);
 			arrange();
+			focus(NULL);
 		}
 	}
 }
@@ -568,28 +561,37 @@ detach(Client *c)
 	*tc = c->next;
 }
 
-static 
-void dispatchsocketevent(void){
+static void dispatchsocketevent(void) {
     int cfd = accept(sockfd, NULL, NULL);
     char buffer[1024] = {0};
-	char *ret = NULL;
+    ssize_t readSize;
 
-    read(cfd, buffer, sizeof(buffer));
+    if (cfd < 0)
+        return;
 
-	/* socket protocol is- request \n payload */
-    char *seventStr = strtok(buffer, DELIMITER);
-    char *payload = strtok(NULL, DELIMITER);
+    while ((readSize = read(cfd, buffer, sizeof(buffer) - 1)) > 0) {
+        buffer[readSize] = '\0';  
 
-    if (seventStr != NULL) {
-        int sevent = atoi(seventStr); 
-        if (sevent >= 0 && sevent < sizeof(shandler)/sizeof(shandler[0])) {
-            if (shandler[sevent]) {
-                ret = shandler[sevent](payload);
+        // socket protocol is- request \n payload or END to terminate
+        char *seventStr = strtok(buffer, DELIMITER);
+        char *payload = strtok(NULL, DELIMITER);
+
+        if (seventStr != NULL) {
+            int sevent = atoi(seventStr);
+            if (sevent >= 0 && sevent < sizeof(shandler) / sizeof(shandler[0])) {
+                if (shandler[sevent]) {
+                    char *ret = shandler[sevent](payload);
+                    if (ret) 
+                        write(cfd, ret, strlen(ret));
+					else
+						break;
+                }
             }
         }
+        memset(buffer, 0, sizeof(buffer)); 
     }
-	write(cfd, ret, strlen(ret));
-	close(cfd);
+
+    close(cfd);
 }
 
 void
@@ -598,8 +600,6 @@ drawbar()
 	int x, w, tw = 0;
 	int boxs = drw->fonts->h / 9;
 	int boxw = drw->fonts->h / 6 + 2;
-	unsigned int i, occ = 0, urg = 0;
-	Client *c;
 
 	if (!mon.showbar)
 		return;
@@ -704,15 +704,14 @@ getclient(char *param) {
 
     /* Convert param to integer and check for valid conversion */
     if (param == NULL || (index = atoi(param)) < 0) 
-		return '\0';
+		return NULL;
 
     /* Iterate through clients to find the requested one */
     for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
-        if (i == index) {
+        if (i == index) 
             return c->name;
-        }
     }
-    return '\0';
+    return NULL;
 }
 
 int
@@ -834,12 +833,10 @@ keypress(XEvent *e)
 void
 killclient(const Arg *arg)
 {
-	Client *next;
-
 	if (!mon.clients)
 		return;
-	next = mon.clients->next;
 	if (!sendevent(mon.clients, wmatom[WMDelete])) {
+		detach(mon.clients);
 		XGrabServer(dpy);
 		XSetErrorHandler(xerrordummy);
 		XSetCloseDownMode(dpy, DestroyAll);
@@ -847,14 +844,13 @@ killclient(const Arg *arg)
 		XSync(dpy, False);
 		XSetErrorHandler(xerror);
 		XUngrabServer(dpy);
-		mon.clients = next;
 	}
 }
 
 void
 manage(Window w, XWindowAttributes *wa)
 {
-	Client *c, *t, *n = NULL;
+	Client *c, *t = NULL;
 	Window trans = None;
 	XWindowChanges wc;
 
@@ -889,17 +885,17 @@ manage(Window w, XWindowAttributes *wa)
 	XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	grabbuttons(c, 0);
 	if (!c->isfloating)
-		c->isfloating = c->oldstate = trans != None || c->isfixed;
+		c->isfloating = c->isfixed;
 	if (c->isfloating)
 		XRaiseWindow(dpy, c->win);
 	attach(c);
-	attachstack(c);
 	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
 		(unsigned char *) &(c->win), 1);
 	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
 	setclientstate(c, NormalState);
+	arrange();
 	XMapWindow(dpy, c->win);
-	focus(c);
+	focus(NULL);
 }
 
 void
@@ -1024,8 +1020,6 @@ resizeclient(Client *c, int x, int y, int w, int h)
 	XSync(dpy, False);
 }
 
-/* TODO: do we need to mark these as floating to make this do anything? */
-/* since we morphed restack/arrange/monocle which will maximize windows that aren't floating*/
 void
 resizemouse(const Arg *arg)
 {
@@ -1057,11 +1051,11 @@ resizemouse(const Arg *arg)
 
 void run(void) {
     XEvent ev;
-    int xfd;
+    int xfd, timeout;
     struct pollfd fds[2];
 
-    int xfd = ConnectionNumber(dpy);
-    int timeout = 100; // Poll timeout in milliseconds
+    xfd = ConnectionNumber(dpy);
+    timeout = 100; // Poll timeout in milliseconds
 
    /* Initialize pollfd structure */
     fds[0].fd = xfd;
@@ -1347,7 +1341,6 @@ unmanage(Client *c, int destroyed)
 	XWindowChanges wc;
 
 	detach(c);
-	detachstack(c);
 	if (!destroyed) {
 		wc.border_width = c->oldbw;
 		XGrabServer(dpy); /* avoid race conditions */
@@ -1361,9 +1354,9 @@ unmanage(Client *c, int destroyed)
 		XUngrabServer(dpy);
 	}
 	free(c);
+	arrange();
 	focus(NULL);
 	updateclientlist();
-	arrange();
 }
 
 void
@@ -1387,8 +1380,8 @@ updatebarpos()
 	mon.wh = mon.mh;
 	if (mon.showbar) {
 		mon.wh -= bh;
-		mon.by = mon.topbar ? mon.wy : mon.wy + mon.wh;
-		mon.wy = mon.topbar ? mon.wy + bh : mon.wy;
+		mon.by = mon.wy;
+		mon.wy = mon.wy + bh; 
 	} else
 		mon.by = -bh;
 }
@@ -1405,8 +1398,6 @@ updateclientlist()
 			(unsigned char *) &(c->win), 1);
 }
 
-/*  checking if the monitor's dimensions (mw and mh for width 
-and height, respectively) match the screen's dimensions (sw and sh) */
 int
 updategeom(void)
 {

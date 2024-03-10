@@ -32,11 +32,11 @@ static const char *termcmd[]  = { "uxterm", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
-	{ Mod1Mask,                       XK_p,      spawn,          {.v = dmenucmd } },
-	{ Mod1Mask|ShiftMask,             XK_Return, spawn,          {.v = termcmd } },
-	{ Mod1Mask,                       XK_b,      togglebar,      {0} },
-	{ Mod1Mask|ShiftMask,             XK_c,      killclient,     {0} },
-	{ Mod1Mask|ShiftMask,             XK_q,      quit,           {0} },
+	{ Mod1Mask,                     XK_p,      spawn,          {.v = dmenucmd } },
+	{ Mod1Mask|ShiftMask,           XK_Return, spawn,          {.v = termcmd } },
+	{ Mod1Mask,                     XK_b,      togglebar,      {0} },
+	{ Mod1Mask|ShiftMask,           XK_c,      killclient,     {0} },
+	{ Mod1Mask|ShiftMask,           XK_q,      quit,           {0} },
 };
 
 /* button definitions */
@@ -44,8 +44,8 @@ static const Key keys[] = {
 static const Button buttons[] = {
 	/* click                event mask      button          function        argument */
 	{ ClkStatusText,        0,              Button2,        spawn,          {.v = termcmd } },
-	{ ClkClientWin,         Mod1Mask,         Button1,        movemouse,      {0} },
-	{ ClkClientWin,         Mod1Mask,         Button2,        togglefloating, {0} },
-	{ ClkClientWin,         Mod1Mask,         Button3,        resizemouse,    {0} },
+	{ ClkClientWin,         Mod1Mask,       Button1,        movemouse,      {0} },
+	{ ClkClientWin,         Mod1Mask,       Button2,        togglefloating, {0} },
+	{ ClkClientWin,         Mod1Mask,       Button3,        resizemouse,    {0} },
 };
 
