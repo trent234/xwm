@@ -27,7 +27,7 @@ clean:
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -f dwm dmenu ./menu/dmenu_run ${DESTDIR}${PREFIX}/bin
+	cp -f dwm dmenu ./menu/dmenu_run ./menu/dmenu_switch ${DESTDIR}${PREFIX}/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/dwm
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu_run
