@@ -1,0 +1,28 @@
+#!/bin/bash
+
+SOCKET_PATH="/tmp/xwm"
+SetFocus=1 # Corresponding to the enumerated endpoint in dwm.c
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <client-position>"
+    exit 1
+fi
+
+clientPos=$1
+message="$SetFocus \n $clientPos"
+
+# Create a UNIX domain stream socket
+exec 3<>/dev/tcp/unix/$(echo -n "$SOCKET_PATH" | od -An -tx1 | tr -d ' \n')
+
+# Send the message
+echo -n "$message" >&3
+
+# Read & print the response
+while IFS= read -r line <&3; do
+    echo "Response: $line"
+    break 
+done
+
+# Close the socket
+exec 3<&-
+exec 3>&-
