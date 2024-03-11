@@ -61,7 +61,7 @@ enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWin
        NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkStatusText, ClkWinTitle, ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
-enum {GetClient, SetFocus}; /* socket commands */
+enum {GetClient, SelectClient}; /* socket commands */
 
 typedef union {
 	int i;
@@ -139,7 +139,7 @@ static void expose(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static Atom getatomprop(Client *c, Atom prop);
-static char* getclient(char *unused); /* param is payload only for socket setters */
+static char* getclient(char *body); /* param is payload only for socket setters */
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
@@ -160,6 +160,7 @@ static void resizemouse(const Arg *arg);
 static void run(void);
 static void scan(void);
 static int sendevent(Client *c, Atom proto);
+static char* selectclient(char *body);
 static void setclientstate(Client *c, long state);
 static void setfocus(Client *c);
 static void setup(void);
@@ -196,7 +197,7 @@ static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static char* (*shandler[2]) (char *) = {
 	[GetClient] = getclient,
-	[SetFocus] = setfocus, /* this is an existing function. assuming behavior will need to be modified */
+	[SelectClient] = selectclient, /* this is an existing function. assuming behavior will need to be modified */
 };
 static void (*xhandler[LASTEvent]) (XEvent *) = {
 	[ButtonPress] = buttonpress,
@@ -699,11 +700,11 @@ getatomprop(Client *c, Atom prop)
 }
 
 char* 
-getclient(char *param) {
+getclient(char *body) {
     int index, i = 0;
 
-    /* Convert param to integer and check for valid conversion */
-    if (param == NULL || (index = atoi(param)) < 0) 
+    /* Convert body to integer and check for valid conversion */
+    if (body == NULL || (index = atoi(body)) < 0) 
 		return NULL;
 
     /* Iterate through clients to find the requested one */
@@ -1109,6 +1110,26 @@ scan(void)
 		if (wins)
 			XFree(wins);
 	}
+}
+
+char*
+selectclient(char *body)
+{
+    int index, i = 0;
+
+    /* Convert body to integer and check for valid conversion */
+    if (body == NULL || (index = atoi(body)) < 0) 
+		return NULL;
+
+    /* Iterate through clients to find the requested one */
+    for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
+        if (i == index) {
+			arrange();
+			focus(c);
+			return c->name;
+		}
+    }
+    return NULL;
 }
 
 void
