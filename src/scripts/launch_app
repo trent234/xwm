@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Directories to search for .desktop files
-search_dirs="/usr/share/applications ~/.local/share/applications"
+search_dirs="/usr/share/applications"
 
 # Create an empty list to hold all executable names
 executables=""

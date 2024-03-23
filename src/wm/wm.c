@@ -6,7 +6,7 @@
  * events about window (dis-)appearance. Only one X connection at a time is
  * allowed to select for this event mask.
  *
- * The event handlers of dwm are organized in an array which is accessed
+ * The event handlers of wm are organized in an array which is accessed
  * whenever a new event has been fetched. This allows event dispatching
  * in O(1) time.
  *
@@ -40,8 +40,8 @@
 #include <X11/Xutil.h>
 #include <X11/Xft/Xft.h>
 
-#include "../deps/drw.h"
-#include "../deps/util.h"
+#include "../common/drw.h"
+#include "../common/util.h"
 
 /* macros */
 #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
@@ -225,7 +225,7 @@ static Monitor mon;
 static Window root, wmcheckwin;
 
 /* configuration, allows nested code to access above variables */
-#include "dwm.h"
+#include "wm.h"
 
 /* function implementations */
 void
@@ -532,7 +532,7 @@ createbar(void)
 		.background_pixmap = ParentRelative,
 		.event_mask = ButtonPressMask|ExposureMask
 	};
-	XClassHint ch = {"dwm", "dwm"};
+	XClassHint ch = {"wm", "wm"};
 	if (!mon.barwin){
 		mon.barwin = XCreateWindow(dpy, root, mon.wx, mon.by, mon.ww, bh, 0, DefaultDepth(dpy, screen),
 				CopyFromParent, DefaultVisual(dpy, screen),
@@ -563,36 +563,40 @@ detach(Client *c)
 }
 
 static void dispatchsocketevent(void) {
-    int cfd = accept(sockfd, NULL, NULL);
+    int fd = accept(sockfd, NULL, NULL);
     char buffer[1024] = {0};
-    ssize_t readSize;
+    ssize_t r_size, w_size;
 
-    if (cfd < 0)
+    if (fd < 0)
         return;
 
-    while ((readSize = read(cfd, buffer, sizeof(buffer) - 1)) > 0) {
-        buffer[readSize] = '\0';  
-
-        // socket protocol is- request \n payload or END to terminate
-        char *seventStr = strtok(buffer, DELIMITER);
-        char *payload = strtok(NULL, DELIMITER);
-
-        if (seventStr != NULL) {
-            int sevent = atoi(seventStr);
-            if (sevent >= 0 && sevent < sizeof(shandler) / sizeof(shandler[0])) {
-                if (shandler[sevent]) {
-                    char *ret = shandler[sevent](payload);
-                    if (ret) 
-                        write(cfd, ret, strlen(ret));
-					else
-						break;
-                }
-            }
-        }
-        memset(buffer, 0, sizeof(buffer)); 
+	/* read in request */
+    r_size = read(fd, buffer, sizeof(buffer) - 1);
+	if (r_size <= 0) {
+        close(fd);
+        return;
     }
+    buffer[r_size] = '\0';  
 
-    close(cfd);
+    /* socket protocol is- request \n payload */
+    char *sevent_str = strtok(buffer, DELIMITER);
+    char *payload = strtok(NULL, DELIMITER);
+
+    if (sevent_str != NULL) {
+        int sevent = atoi(sevent_str);
+		/* check if the event is within the bounds of the handler array */
+        if (sevent >= 0 && sevent < sizeof(shandler) / sizeof(shandler[0])) {
+			/* call handler and write response if one exists */
+            char *ret = shandler[sevent](payload);
+            if (ret) {
+                w_size = write(fd, ret, strlen(ret));
+				if(w_size < 0) 
+					perror("write error");
+			}
+		}
+	}
+    memset(buffer, 0, sizeof(buffer)); 
+    close(fd);
 }
 
 void
@@ -700,19 +704,20 @@ getatomprop(Client *c, Atom prop)
 }
 
 char* 
-getclient(char *body) {
-    int index, i = 0;
+getclient(char *unused) {
+    static char buf[4096];
+    int i = 0;
+    buf[0] = '\0'; // Initialize buffer to an empty string
 
-    /* Convert body to integer and check for valid conversion */
-    if (body == NULL || (index = atoi(body)) < 0) 
-		return NULL;
-
-    /* Iterate through clients to find the requested one */
+    // Iterate through clients to append position and name to buf
     for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
-        if (i == index) 
-            return c->name;
+        // Ensure buffer doesn't overflow, account for number length, name length, 2 extra chars for space and newline
+        if (strlen(buf) + strlen(c->name) + 10 > sizeof(buf)) 
+            break; // Prevent buffer overflow
+        snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%d %s\n", i, c->name);
     }
-    return NULL;
+
+    return buf;
 }
 
 int
@@ -1237,7 +1242,7 @@ setup(void)
 	XChangeProperty(dpy, wmcheckwin, netatom[NetWMCheck], XA_WINDOW, 32,
 		PropModeReplace, (unsigned char *) &wmcheckwin, 1);
 	XChangeProperty(dpy, wmcheckwin, netatom[NetWMName], utf8string, 8,
-		PropModeReplace, (unsigned char *) "dwm", 3);
+		PropModeReplace, (unsigned char *) "wm", 3);
 	XChangeProperty(dpy, root, netatom[NetWMCheck], XA_WINDOW, 32,
 		PropModeReplace, (unsigned char *) &wmcheckwin, 1);
 	/* EWMH support per view */
@@ -1318,7 +1323,7 @@ spawn(const Arg *arg)
 		sigaction(SIGCHLD, &sa, NULL);
 
 		execvp(((char **)arg->v)[0], (char **)arg->v);
-		die("dwm: execvp '%s' failed:", ((char **)arg->v)[0]);
+		die("wm: execvp '%s' failed:", ((char **)arg->v)[0]);
 	}
 }
 
@@ -1496,7 +1501,7 @@ void
 updatestatus(void)
 {
 	if (!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
-		strcpy(stext, "dwm");
+		strcpy(stext, "wm");
 	drawbar();
 }
 
@@ -1564,7 +1569,7 @@ xerror(Display *dpy, XErrorEvent *ee)
 	|| (ee->request_code == X_GrabKey && ee->error_code == BadAccess)
 	|| (ee->request_code == X_CopyArea && ee->error_code == BadDrawable))
 		return 0;
-	fprintf(stderr, "dwm: fatal error: request code=%d, error code=%d\n",
+	fprintf(stderr, "wm: fatal error: request code=%d, error code=%d\n",
 		ee->request_code, ee->error_code);
 	return xerrorxlib(dpy, ee); /* may call exit */
 }
@@ -1578,7 +1583,7 @@ xerrordummy(Display *dpy, XErrorEvent *ee)
 int
 xerrorstart(Display *dpy, XErrorEvent *ee)
 {
-	die("dwm: another window manager is already running");
+	die("wm: another window manager is already running");
 	return -1;
 }
 
@@ -1586,11 +1591,11 @@ int
 main(int argc, char *argv[])
 {
 	if (argc != 1)
-		die("usage: dwm");
+		die("usage: wm");
 	if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
 		fputs("warning: no locale support\n", stderr);
 	if (!(dpy = XOpenDisplay(NULL)))
-		die("dwm: cannot open display");
+		die("wm: cannot open display");
 	checkotherwm();
 	setup();
 	scan();

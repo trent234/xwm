@@ -1,40 +1,45 @@
-# Fork of dwm and dmenu, combined
+# Fork of dwm and menu, combined ->  DE for X11
 # See LICENSE file for copyright and license details.
 
 include config.mk
 
-DEPS_SRC = deps/drw.c deps/util.c
-DWM_SRC = wm/dwm.c $(DEPS_SRC)
-DMENU_SRC = menu/dmenu.c $(DEPS_SRC)
-SRC = $(DWM_SRC) $(DMENU_SRC)
+COMMON_SRC = src/common/drw.c src/common/util.c
+WM_SRC = src/wm/wm.c $(COMMON_SRC)
+MENU_SRC = src/menu/menu.c $(COMMON_SRC)
+SRC = $(WM_SRC) $(MENU_SRC) 
 OBJ = ${SRC:.c=.o}
 
-all: dwm dmenu
+all: wm menu
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(OBJ): config.mk
 
-dwm: $(DWM_SRC:.c=.o)
+wm: $(WM_SRC:.c=.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
-dmenu: $(DMENU_SRC:.c=.o)
+menu: $(MENU_SRC:.c=.o)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f $(OBJ) dwm dmenu
+	rm -f $(OBJ) wm menu
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -f dwm dmenu ./menu/dmenu_run ./menu/dmenu_switch ${DESTDIR}${PREFIX}/bin
-	chmod 755 ${DESTDIR}${PREFIX}/bin/dwm
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/dmenu_run
+	cp -f wm menu ${DESTDIR}${PREFIX}/bin
+	chmod 755 ${DESTDIR}${PREFIX}/bin/wm
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/menu
+	cp -f src/scripts/launch_app src/scripts/switch_app src/scripts/util_set_focus ${DESTDIR}${PREFIX}/bin
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/laucnh_app
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/switch_app
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/util_set_focus
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/dwm\
-		${DESTDIR}${PREFIX}/bin/dmenu\
-		${DESTDIR}${PREFIX}/bin/dmenu_run
+	rm -f ${DESTDIR}${PREFIX}/bin/wm\
+		${DESTDIR}${PREFIX}/bin/menu\
+		${DESTDIR}${PREFIX}/bin/launch_app\
+		${DESTDIR}${PREFIX}/bin/switch_app\
+		${DESTDIR}${PREFIX}/bin/util_set_focus\
 
 .PHONY: all clean dist install uninstall

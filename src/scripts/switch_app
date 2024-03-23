@@ -1,0 +1,9 @@
+#!/bin/bash
+
+SOCKET_PATH="/tmp/xwm"
+GETCLIENTS=0 # Corresponding to the enumerated endpoint in dwm.c
+
+clients=$(echo -e "$GETCLIENTS" | nc.openbsd -U "$SOCKET_PATH")
+selected_client=$(echo -e "$clients" | dmenu "$@")
+selected_pos=$(echo "$selected_client" | cut -d ' ' -f1)
+util_set_focus "$selected_pos" &
