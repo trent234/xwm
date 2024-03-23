@@ -61,7 +61,7 @@ enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWin
        NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkStatusText, ClkWinTitle, ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
-enum {GetClient, SelectClient}; /* socket commands */
+enum {GetClients, SelectClient}; /* socket commands */
 
 typedef union {
 	int i;
@@ -139,7 +139,7 @@ static void expose(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static Atom getatomprop(Client *c, Atom prop);
-static char* getclient(char *body); /* param is payload only for socket setters */
+static char* getclients(char *body); /* param is payload only for socket setters */
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
@@ -196,7 +196,7 @@ static int lrpad;            /* sum of left and right padding for text */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static char* (*shandler[2]) (char *) = {
-	[GetClient] = getclient,
+	[GetClients] = getclients,
 	[SelectClient] = selectclient, /* this is an existing function. assuming behavior will need to be modified */
 };
 static void (*xhandler[LASTEvent]) (XEvent *) = {
@@ -369,8 +369,8 @@ buttonpress(XEvent *e)
 		else
 			click = ClkWinTitle;
 	} else if ((c = wintoclient(ev->window))) {
-		arrange();
 		focus(c);
+		arrange();
 		XAllowEvents(dpy, ReplayPointer, CurrentTime);
 		click = ClkClientWin;
 	}
@@ -469,8 +469,8 @@ configurenotify(XEvent *e)
 			drw_resize(drw, sw, bh);
 			createbar();
 			XMoveResizeWindow(dpy, mon.barwin, mon.wx, mon.by, mon.ww, bh);
-			arrange();
 			focus(NULL);
+			arrange();
 		}
 	}
 }
@@ -704,19 +704,18 @@ getatomprop(Client *c, Atom prop)
 }
 
 char* 
-getclient(char *unused) {
+getclients(char *unused) {
     static char buf[4096];
     int i = 0;
-    buf[0] = '\0'; // Initialize buffer to an empty string
+    buf[0] = '\0'; 
 
-    // Iterate through clients to append position and name to buf
     for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
-        // Ensure buffer doesn't overflow, account for number length, name length, 2 extra chars for space and newline
+        /* Ensure buffer doesn't overflow, account for number length, 
+		name length, 2 extra chars for space and newline */
         if (strlen(buf) + strlen(c->name) + 10 > sizeof(buf)) 
-            break; // Prevent buffer overflow
+            break; 
         snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%d %s\n", i, c->name);
     }
-
     return buf;
 }
 
@@ -899,9 +898,9 @@ manage(Window w, XWindowAttributes *wa)
 		(unsigned char *) &(c->win), 1);
 	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
 	setclientstate(c, NormalState);
+	focus(NULL);
 	arrange();
 	XMapWindow(dpy, c->win);
-	focus(NULL);
 }
 
 void
@@ -1122,15 +1121,14 @@ selectclient(char *body)
 {
     int index, i = 0;
 
-    /* Convert body to integer and check for valid conversion */
     if (body == NULL || (index = atoi(body)) < 0) 
 		return NULL;
 
     /* Iterate through clients to find the requested one */
     for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
         if (i == index) {
-			arrange();
 			focus(c);
+			arrange();
 			return c->name;
 		}
     }
@@ -1380,8 +1378,8 @@ unmanage(Client *c, int destroyed)
 		XUngrabServer(dpy);
 	}
 	free(c);
-	arrange();
 	focus(NULL);
+	arrange();
 	updateclientlist();
 }
 

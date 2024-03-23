@@ -25,15 +25,15 @@ static const Rule rules[] = {
 static const int resizehints = 1;    /* 1 means respect size hints in tiled resizals */
 
 /* commands */
-static const char *dmenu_run[] = { "dmenu_run", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
-static const char *dmenu_switch[] = { "dmenu_switch", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
+static const char *launch_app[] = { "launch_app", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
+static const char *switch_app[] = { "switch_app", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
 static const char *termcmd[]  = { "uxterm", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
-	{ Mod1Mask,                     XK_p,      spawn,          {.v = dmenu_run } },
-	{ Mod1Mask,                     XK_o,      spawn,          {.v = dmenu_switch } },
-	{ Mod1Mask|ShiftMask,           XK_Return, spawn,          {.v = termcmd } },
+	{ Mod1Mask,                     XK_f,      spawn,          {.v = launch_app } },
+	{ Mod1Mask,                     XK_j,      spawn,          {.v = switch_app } },
+	{ Mod1Mask,			            XK_Return, spawn,          {.v = termcmd } },
 	{ Mod1Mask,                     XK_b,      togglebar,      {0} },
 	{ Mod1Mask|ShiftMask,           XK_c,      killclient,     {0} },
 	{ Mod1Mask|ShiftMask,           XK_q,      quit,           {0} },

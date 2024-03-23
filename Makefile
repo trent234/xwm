@@ -1,4 +1,4 @@
-# Fork of dwm and menu, combined ->  DE for X11
+# Fork of dwm and menu 
 # See LICENSE file for copyright and license details.
 
 include config.mk
@@ -30,16 +30,14 @@ install: all
 	cp -f wm menu ${DESTDIR}${PREFIX}/bin
 	chmod 755 ${DESTDIR}${PREFIX}/bin/wm
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/menu
-	cp -f src/scripts/launch_app src/scripts/switch_app src/scripts/util_set_focus ${DESTDIR}${PREFIX}/bin
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/laucnh_app
+	cp -f src/scripts/launch_app src/scripts/switch_app ${DESTDIR}${PREFIX}/bin
+	chmod 755 $(DESTDIR)$(PREFIX)/bin/launch_app
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/switch_app
-	chmod 755 $(DESTDIR)$(PREFIX)/bin/util_set_focus
 
 uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/wm\
 		${DESTDIR}${PREFIX}/bin/menu\
 		${DESTDIR}${PREFIX}/bin/launch_app\
-		${DESTDIR}${PREFIX}/bin/switch_app\
-		${DESTDIR}${PREFIX}/bin/util_set_focus\
+		${DESTDIR}${PREFIX}/bin/switch_app
 
 .PHONY: all clean dist install uninstall
