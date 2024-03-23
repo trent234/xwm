@@ -1,0 +1,18 @@
+#!/bin/bash
+
+SOCKET_PATH="/tmp/xwm"
+# Enumerated endpoints in dwm.c
+GETCLIENTS=0  
+SETFOCUS=1  
+
+# Retrieve clients list from wm and pipe it to menu
+clients=$(echo -e "$GETCLIENTS" | nc -U "$SOCKET_PATH")
+selected_client=$(echo -e "$clients" | menu "$@")
+
+# Extract the position from the selected client string
+# Assuming the client string format "pos client_name"
+selected_pos=$(echo "$selected_client" | cut -d ' ' -f1)
+
+# Construct msg to set focus on the selected client and send it to wm
+MESSAGE="$SETFOCUS\n$selected_pos"
+echo -e "$MESSAGE" | nc -U "$SOCKET_PATH"

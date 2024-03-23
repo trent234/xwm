@@ -13,8 +13,8 @@
 #include <X11/Xutil.h>
 #include <X11/Xft/Xft.h>
 
-#include "../deps/drw.h"
-#include "../deps/util.h"
+#include "../common/drw.h"
+#include "../common/util.h"
 
 /* macros */
 #define INTERSECT(x,y,w,h,r)  (MAX(0, MIN((x)+(w),(r).x_org+(r).width)  - MAX((x),(r).x_org)) \
@@ -24,6 +24,8 @@
 
 /* enums */
 enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
+enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWindowType,
+       NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 
 struct item {
 	char *text;
@@ -42,7 +44,7 @@ static struct item *matches, *matchend;
 static struct item *prev, *curr, *next, *sel;
 static int screen;
 
-static Atom clip, utf8;
+static Atom clip, utf8, netatom[NetLast];
 static Display *dpy;
 static Window root, parentwin, win;
 static XIC xic;
@@ -50,7 +52,7 @@ static XIC xic;
 static Drw *drw;
 static Clr *scheme[SchemeLast];
 
-#include "dmenu.h"
+#include "menu.h"
 
 static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
 static char *(*fstrstr)(const char *, const char *) = strstr;
@@ -617,7 +619,16 @@ setup(void)
 	XIM xim;
 	Window w, dw, *dws;
 	XWindowAttributes wa;
-	XClassHint ch = {"dmenu", "dmenu"};
+	XClassHint ch = {"menu", "menu"};
+	/* init atoms */
+	netatom[NetActiveWindow] = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+	netatom[NetSupported] = XInternAtom(dpy, "_NET_SUPPORTED", False);
+	netatom[NetWMName] = XInternAtom(dpy, "_NET_WM_NAME", False);
+	netatom[NetWMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
+	netatom[NetWMCheck] = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
+	netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
+	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	/* init appearance */
 	for (j = 0; j < SchemeLast; j++)
 		scheme[j] = drw_scm_create(drw, colors[j], 2);
@@ -642,14 +653,15 @@ setup(void)
 	match();
 
 	/* create menu window */
-	swa.override_redirect = True;
+	swa.override_redirect = False;
 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
 	win = XCreateWindow(dpy, root, x, y, mw, mh, 0,
 	                    CopyFromParent, CopyFromParent, CopyFromParent,
-	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
+	                    CWBackPixel | CWEventMask, &swa);
 	XSetClassHint(dpy, win, &ch);
-
+	XChangeProperty(dpy, win, netatom[NetWMName], utf8, 8,
+		PropModeReplace, (unsigned char *) "Menu", 4);
 
 	/* input methods */
 	if ((xim = XOpenIM(dpy, NULL, NULL, NULL)) == NULL)
@@ -676,7 +688,7 @@ setup(void)
 static void
 usage(void)
 {
-	die("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"
+	die("usage: menu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"
 	    "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]");
 }
 
@@ -689,7 +701,7 @@ main(int argc, char *argv[])
 	for (i = 1; i < argc; i++)
 		/* these options take no arguments */
 		if (!strcmp(argv[i], "-v")) {      /* prints version information */
-			puts("dmenu");
+			puts("menu");
 			exit(0);
 		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
 			topbar = 0;

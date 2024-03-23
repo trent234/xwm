@@ -6,15 +6,13 @@ static const unsigned int snap      = 32;       /* snap pixel */
 static const int showbar            = 1;        /* 0 means no bar */
 static const char *fonts[]          = { "monospace:size=10" };
 static const char dmenufont[]       = "monospace:size=10";
-static const char col_gray1[]       = "#222222";
-static const char col_gray2[]       = "#444444";
-static const char col_gray3[]       = "#bbbbbb";
-static const char col_gray4[]       = "#eeeeee";
-static const char col_cyan[]        = "#005577";
-static const char *colors[][3]      = {
-	/*               fg         bg         border   */
-	[SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
-	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
+static const char col_black[] 		= "#000000";
+static const char col_white[] 		= "#FFFFFF";
+
+static const char *colors[][3] = {
+    /*               fg         bg         border   */
+    [SchemeNorm] = { col_black, col_white, col_black },
+    [SchemeSel]  = { col_white, col_black, col_white },
 };
 
 static const Rule rules[] = {
@@ -27,13 +25,15 @@ static const Rule rules[] = {
 static const int resizehints = 1;    /* 1 means respect size hints in tiled resizals */
 
 /* commands */
-static const char *dmenucmd[] = { "dmenu_run", "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
+static const char *launch_app[] = { "launch_app", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
+static const char *switch_app[] = { "switch_app", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
 static const char *termcmd[]  = { "uxterm", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
-	{ Mod1Mask,                     XK_p,      spawn,          {.v = dmenucmd } },
-	{ Mod1Mask|ShiftMask,           XK_Return, spawn,          {.v = termcmd } },
+	{ Mod1Mask,                     XK_f,      spawn,          {.v = launch_app } },
+	{ Mod1Mask,                     XK_j,      spawn,          {.v = switch_app } },
+	{ Mod1Mask,			            XK_Return, spawn,          {.v = termcmd } },
 	{ Mod1Mask,                     XK_b,      togglebar,      {0} },
 	{ Mod1Mask|ShiftMask,           XK_c,      killclient,     {0} },
 	{ Mod1Mask|ShiftMask,           XK_q,      quit,           {0} },
