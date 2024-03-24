@@ -5,7 +5,7 @@ apps=""
 
 for dir in $search_dirs; do
     for desktop_file in $(find $dir -name '*.desktop'); do
-        # Extract the Exec command, remove arguments and field codes
+        # extract the exec command, remove arguments and field codes
         exec_line=$(grep '^Exec=' "$desktop_file" | head -n 1 | sed 's/^Exec=//' | cut -d ' ' -f 1)
         if [ -n "$exec_line" ]; then
             apps="$apps\n$exec_line"

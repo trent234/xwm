@@ -1,4 +1,5 @@
 /* See LICENSE file for copyright and license details. */
+
 #include <ctype.h>
 #include <locale.h>
 #include <stdio.h>
@@ -33,9 +34,31 @@ struct item {
 	int out;
 };
 
+/* function declarations */
+static unsigned int textw_clamp(const char *str, unsigned int n);
+static void appenditem(struct item *item, struct item **list, struct item **last);
+static void calcoffsets(void);
+static void cleanup(void);
+static char * cistrstr(const char *h, const char *n);
+static int drawitem(struct item *item, int x, int y, int w);
+static void drawmenu(void);
+static void grabfocus(void);
+static void	grabkeyboard(void);
+static void	match(void);
+static void insert(const char *str, ssize_t n);
+static size_t nextrune(int inc);
+static void movewordedge(int dir);
+static void keypress(XKeyEvent *ev);
+static void paste(void);
+static void readstdin(void);
+static void run(void);
+static void setup(void);
+
+/* variables */
 static char text[BUFSIZ] = "";
 static char *embed;
 static int bh, mw, mh;
+static unsigned int lines;
 static int inputw = 0, promptw;
 static int lrpad; /* sum of left and right padding */
 static size_t cursor;
@@ -82,16 +105,13 @@ calcoffsets(void)
 {
 	int i, n;
 
-	if (lines > 0)
-		n = lines * bh;
-	else
-		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));
+	n = lines * bh;
 	/* calculate which items will begin the next page and previous page */
 	for (i = 0, next = curr; next; next = next->right)
-		if ((i += (lines > 0) ? bh : textw_clamp(next->text, n)) > n)
+		if ((i += bh) > n)
 			break;
 	for (i = 0, prev = curr; prev && prev->left; prev = prev->left)
-		if ((i += (lines > 0) ? bh : textw_clamp(prev->left->text, n)) > n)
+		if ((i += bh) > n)
 			break;
 }
 
@@ -638,8 +658,6 @@ setup(void)
 
 	/* calculate menu geometry */
 	bh = drw->fonts->h + 2;
-	lines = MAX(lines, 0);
-	mh = (lines + 1) * bh;
 	{
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
@@ -647,9 +665,11 @@ setup(void)
 		x = 0;
 		y = topbar ? 0 : wa.height - mh;
 		mw = wa.width;
+		mh = wa.height;
 	}
+	lines = mh / bh - 1;
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
-	inputw = mw / 3; /* input width: ~33% of monitor width */
+	inputw = mw; 
 	match();
 
 	/* create menu window */
@@ -688,8 +708,8 @@ setup(void)
 static void
 usage(void)
 {
-	die("usage: menu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"
-	    "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]");
+	die("usage: menu [-bfiv] [-p prompt] [-fn font] [-nb color]\n"
+	    "             [-nf color] [-sb color] [-sf color] [-w windowid]");
 }
 
 int
@@ -713,8 +733,6 @@ main(int argc, char *argv[])
 		} else if (i + 1 == argc)
 			usage();
 		/* these options take one argument */
-		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
-			lines = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
 			prompt = argv[++i];
 		else if (!strcmp(argv[i], "-fn"))  /* font or font set */
