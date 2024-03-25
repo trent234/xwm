@@ -1,3 +1,4 @@
+
 # xwm - eXperimental window manager
 
 xwm is an experiment that started as a fork of dwm and dmenu. I've been interested in hacking on a wm and instead of starting from scratch thought it'd be more fun to start with a fork of the wm that I've been using for years and have come to appreciate. Kind of like learning how a car works by slowly taking it apart, I'm using dwm to learn about xlib.
@@ -5,8 +6,9 @@ xwm is an experiment that started as a fork of dwm and dmenu. I've been interest
 One potential goal is to boil this wm into an even simpler version that will be useful on touch devices like the reMarkable 1 and/or the PinePhone. The idea is to use dwm as the start point for the xlib wm components and dmenu for the app launcher which instead of being typing centric will list out gui apps and be scrollable and clickable. Also will be able to list open processes in that launcher as well as programs, and modifying the classic layout to instead have one main client, and all others are hidden. One exception will need to be the onscreen keyboard which will involve learning from the team behind the sxmo-dwm project and use a dock patch where svkb declares itself as a special type of client that gets handled by dwm specially.
 
 ## Current Project Status & Notes
+The next todo is to make the menu clickable, then add the keyboard, then gesture support.  
 
-Generally speaking these are the changes so far to dwm
+Generally speaking these are the changes so far to dwm: 
 * Added: 
 	* Visibility for non-floating windows is defined as being the top client in the stack
 	* Socket server 
@@ -26,6 +28,17 @@ I'm removing features partly as an exercise, but it has the benefit of reducing 
 
 dwm 2165 / wm 1582 SLOC  
 dmenu 796 / menu 665 SLOC 
+
+### Screenshots
+#### App Launcher
+![launch_app](https://github.com/trent234/xwm/assets/22989914/1d087cd8-7fc9-4022-b0a4-4ed7c619f864)
+
+#### App Switcher
+![switch_app](https://github.com/trent234/xwm/assets/22989914/6aafe1ca-10f2-479e-a632-96db882db6ca)
+
+#### App Selected
+![app](https://github.com/trent234/xwm/assets/22989914/24fb2318-3a57-4ae2-8b0c-d4f7dbfc6cb0)
+
 
 #### wm
 
