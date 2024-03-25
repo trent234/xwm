@@ -7,7 +7,7 @@ selectclient=1
 
 # retrieve clients list from wm and pipe it to menu
 clients=$(echo -e "$getclients" | nc -u "$socket_path")
-selected_client=$(echo -e "$clients" | menu "$@")
+selected_client=$(echo -e "$clients" | menu)
 
 # extract the position from the selected client string
 # assuming the client string format "pos client_name"
