@@ -1,22 +1,4 @@
-/* See LICENSE file for copyright and license details.
- *
- * dynamic window manager is designed like any other X client as well. It is
- * driven through handling X events. In contrast to other X clients, a window
- * manager selects for SubstructureRedirectMask on the root window, to receive
- * events about window (dis-)appearance. Only one X connection at a time is
- * allowed to select for this event mask.
- *
- * The event handlers of wm are organized in an array which is accessed
- * whenever a new event has been fetched. This allows event dispatching
- * in O(1) time.
- *
- * Each child of the root window is called a client, except windows which have
- * set the override_redirect flag. Clients are organized in a linked client list. 
- *
- * Keys rules are organized as arrays and defined in config.h.
- *
- * To understand everything else, start reading main().
- */
+/* See LICENSE file for copyright and license details. */
 
 #include <errno.h>
 #include <locale.h>
@@ -616,14 +598,10 @@ drawbar()
 	x = 0;
 	if ((w = mon.ww - tw - x) > bh) {
 		if (mon.clients) {
-			/* better understand if this is now completely redundant */
-			/* drw_setscheme(drw, scheme[selmon == selmon ? SchemeSel : SchemeNorm]); */
-			drw_setscheme(drw, scheme[SchemeSel]);
 			drw_text(drw, x, 0, w, bh, lrpad / 2, mon.clients->name, 0);
 			if (mon.clients->isfloating)
 				drw_rect(drw, x + boxs, boxs, boxw, boxw, mon.clients->isfixed, 0);
 		} else {
-			drw_setscheme(drw, scheme[SchemeNorm]);
 			drw_rect(drw, x, 0, w, bh, 1, 1);
 		}
 	}

@@ -6,36 +6,64 @@ One potential goal is to boil this wm into an even simpler version that will be 
 
 ## Current Project Status & Notes
 
-Not currently in a working state.
+Generally speaking these are the changes so far to dwm
+* Added: 
+	* Visibility for non-floating windows is defined as being the top client in the stack
+	* Socket server 
+		* serves the client stack 
+		* accepts request for a change in client selection
+		* these endpoints are used to enable app switching with dmenu
+	* Default behavior is monocle, while still permitting floating windows
+	* menu is now a window, list is size of window
+* Removed: 
+	* Multi-monitor support
+	* Tags
+	* Tile layout
+	* Fullscreen (technically. in practice monocle is essentially fullscreen.)
+	* Layout indicator in bar
 
-Generally speaking these are the changes so far
-- removed: multi-monitor support
-- removed: tags
-- removed: tile layout. Default behavior is monocle, while still permitting floating windows.
-- added: socket server which both serves a requested client name and accepts changes in client selection
+I'm removing features partly as an exercise, but it has the benefit of reducing complexity, and certain features are incompatible with the new (simpler) program architecture.  
 
-I'm removing features partly as an exercise, but it has the benefit of reducing complexity, and certain features are incompatible with the new (simpler) program architecture. 
+dwm 2165 / wm 1582 SLOC  
+dmenu 796 / menu 665 SLOC 
+
+#### wm
+
+ This is a dynamic window manager is designed like any other X client as well. It is
+ driven through handling X events (and socket events). In contrast to other X clients, a window
+ manager selects for SubstructureRedirectMask on the root window, to receive
+ events about window (dis-)appearance. Only one X connection at a time is
+ allowed to select for this event mask.  
+
+ The event handlers of wm are organized in an array which is accessed
+ whenever a new event has been fetched. This allows event dispatching
+ in O(1) time.  
+
+ Each child of the root window is called a client, except windows which have
+ set the override_redirect flag. Clients are organized in a linked client list.  
+
+ Keys rules are organized as arrays and defined in config.h.  
 
 ## Requirements
 
-In order to build dwm you need the Xlib header files.
+In order to build you need the Xlib header files.
 
 ## Installation
 
-Edit `config.mk` to match your local setup (dwm is installed into the /usr/local namespace by default).
+Edit `config.mk` to match your local setup (files are installed into the /usr/local namespace by default).
 
-Afterwards enter the following command to build and install dwm (if necessary as root):
+Afterwards enter the following command to build and install (if necessary as root):
 
 ```
 make clean install
 ```
 
-## Running dwm
+## Running wm
 
-Add the following line to your `.xinitrc` to start dwm using `startx`:
+Add the following line to your `.xinitrc` to start the window manager using `startx`:
 
 ```
-exec dwm
+exec wm
 ```
 
 In order to display status info in the bar, you can do something like this in your `.xinitrc`:
@@ -45,5 +73,5 @@ while xsetroot -name "`date` `uptime | sed 's/.*,//'`"
 do
 	sleep 1
 done &
-exec dwm
+exec wm
 ```

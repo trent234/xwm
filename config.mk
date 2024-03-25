@@ -1,4 +1,4 @@
-# xwm version
+# version
 VERSION = 0.1
 
 # paths
@@ -6,14 +6,15 @@ COMMON = ../common
 WM = src/wm
 MENU = src/menu
 
+# x11
 X11INC = /usr/X11R6/include
 X11LIB = /usr/X11R6/lib
 
 # freetype
-FREETYPELIBS = -lfontconfig -lXft
 FREETYPEINC = /usr/include/freetype2
+FREETYPELIBS = -lfontconfig -lXft
 
-# includes and libs
+# includes 
 INCS = -I${X11INC} -I${FREETYPEINC} -I${COMMON} -I${WM} -I${MENU}
 
 # flags

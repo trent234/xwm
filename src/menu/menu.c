@@ -1,4 +1,5 @@
 /* See LICENSE file for copyright and license details. */
+
 #include <ctype.h>
 #include <locale.h>
 #include <stdio.h>
@@ -33,10 +34,28 @@ struct item {
 	int out;
 };
 
+/* function declarations */
+static void appenditem(struct item *item, struct item **list, struct item **last);
+static void calcoffsets(void);
+static void cleanup(void);
+static int drawitem(struct item *item, int x, int y, int w);
+static void drawmenu(void);
+static void grabfocus(void);
+static void	grabkeyboard(void);
+static void	match(void);
+static void insert(const char *str, ssize_t n);
+static size_t nextrune(int inc);
+static void movewordedge(int dir);
+static void keypress(XKeyEvent *ev);
+static void paste(void);
+static void readstdin(void);
+static void run(void);
+static void setup(void);
+
+/* variables */
 static char text[BUFSIZ] = "";
-static char *embed;
 static int bh, mw, mh;
-static int inputw = 0, promptw;
+static unsigned int lines;
 static int lrpad; /* sum of left and right padding */
 static size_t cursor;
 static struct item *items = NULL;
@@ -57,13 +76,6 @@ static Clr *scheme[SchemeLast];
 static int (*fstrncmp)(const char *, const char *, size_t) = strncmp;
 static char *(*fstrstr)(const char *, const char *) = strstr;
 
-static unsigned int
-textw_clamp(const char *str, unsigned int n)
-{
-	unsigned int w = drw_fontset_getwidth_clamp(drw, str, n) + lrpad;
-	return MIN(w, n);
-}
-
 static void
 appenditem(struct item *item, struct item **list, struct item **last)
 {
@@ -82,16 +94,13 @@ calcoffsets(void)
 {
 	int i, n;
 
-	if (lines > 0)
-		n = lines * bh;
-	else
-		n = mw - (promptw + inputw + TEXTW("<") + TEXTW(">"));
+	n = lines * bh;
 	/* calculate which items will begin the next page and previous page */
 	for (i = 0, next = curr; next; next = next->right)
-		if ((i += (lines > 0) ? bh : textw_clamp(next->text, n)) > n)
+		if ((i += bh) > n)
 			break;
 	for (i = 0, prev = curr; prev && prev->left; prev = prev->left)
-		if ((i += (lines > 0) ? bh : textw_clamp(prev->left->text, n)) > n)
+		if ((i += bh) > n)
 			break;
 }
 
@@ -109,24 +118,6 @@ cleanup(void)
 	drw_free(drw);
 	XSync(dpy, False);
 	XCloseDisplay(dpy);
-}
-
-static char *
-cistrstr(const char *h, const char *n)
-{
-	size_t i;
-
-	if (!n[0])
-		return (char *)h;
-
-	for (; *h; ++h) {
-		for (i = 0; n[i] && tolower((unsigned char)n[i]) ==
-		            tolower((unsigned char)h[i]); ++i)
-			;
-		if (n[i] == '\0')
-			return (char *)h;
-	}
-	return NULL;
 }
 
 static int
@@ -147,47 +138,25 @@ drawmenu(void)
 {
 	unsigned int curpos;
 	struct item *item;
-	int x = 0, y = 0, w;
+	int x = 0, y = 0, w = mw;
 
 	drw_setscheme(drw, scheme[SchemeNorm]);
+
+    /* Clear the entire window */
 	drw_rect(drw, 0, 0, mw, mh, 1, 1);
 
-	if (prompt && *prompt) {
-		drw_setscheme(drw, scheme[SchemeSel]);
-		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
-	}
 	/* draw input field */
-	w = (lines > 0 || !matches) ? mw - x : inputw;
-	drw_setscheme(drw, scheme[SchemeNorm]);
 	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
 
 	curpos = TEXTW(text) - TEXTW(&text[cursor]);
 	if ((curpos += lrpad / 2 - 1) < w) {
-		drw_setscheme(drw, scheme[SchemeNorm]);
 		drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
 	}
 
-	if (lines > 0) {
-		/* draw vertical list */
-		for (item = curr; item != next; item = item->right)
-			drawitem(item, x, y += bh, mw - x);
-	} else if (matches) {
-		/* draw horizontal list */
-		x += inputw;
-		w = TEXTW("<");
-		if (curr->left) {
-			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_text(drw, x, 0, w, bh, lrpad / 2, "<", 0);
-		}
-		x += w;
-		for (item = curr; item != next; item = item->right)
-			x = drawitem(item, x, 0, textw_clamp(item->text, mw - x - TEXTW(">")));
-		if (next) {
-			w = TEXTW(">");
-			drw_setscheme(drw, scheme[SchemeNorm]);
-			drw_text(drw, mw - w, 0, w, bh, lrpad / 2, ">", 0);
-		}
-	}
+	/* draw vertical list */
+	for (item = curr; item != next; item = item->right)
+		drawitem(item, x, y += bh, w);
+
 	drw_map(drw, win, 0, 0, mw, mh);
 }
 
@@ -214,8 +183,6 @@ grabkeyboard(void)
 	struct timespec ts = { .tv_sec = 0, .tv_nsec = 1000000  };
 	int i;
 
-	if (embed)
-		return;
 	/* try to grab keyboard, we may have to wait for another process to ungrab */
 	for (i = 0; i < 1000; i++) {
 		if (XGrabKeyboard(dpy, DefaultRootWindow(dpy), True, GrabModeAsync,
@@ -459,12 +426,11 @@ insert:
 		break;
 	case XK_Left:
 	case XK_KP_Left:
-		if (cursor > 0 && (!sel || !sel->left || lines > 0)) {
+		if (cursor > 0 ) {
 			cursor = nextrune(-1);
 			break;
 		}
-		if (lines > 0)
-			return;
+		return;
 		/* fallthrough */
 	case XK_Up:
 	case XK_KP_Up:
@@ -503,8 +469,7 @@ insert:
 			cursor = nextrune(+1);
 			break;
 		}
-		if (lines > 0)
-			return;
+		return;
 		/* fallthrough */
 	case XK_Down:
 	case XK_KP_Down:
@@ -613,11 +578,9 @@ run(void)
 static void
 setup(void)
 {
-	int x, y, i, j;
-	unsigned int du;
+	int x, y, i;
 	XSetWindowAttributes swa;
 	XIM xim;
-	Window w, dw, *dws;
 	XWindowAttributes wa;
 	XClassHint ch = {"menu", "menu"};
 	/* init atoms */
@@ -630,26 +593,24 @@ setup(void)
 	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
 	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	/* init appearance */
-	for (j = 0; j < SchemeLast; j++)
-		scheme[j] = drw_scm_create(drw, colors[j], 2);
+	for (i = 0; i < SchemeLast; i++)
+		scheme[i] = drw_scm_create(drw, colors[i], 2);
 
 	clip = XInternAtom(dpy, "CLIPBOARD",   False);
 	utf8 = XInternAtom(dpy, "UTF8_STRING", False);
 
 	/* calculate menu geometry */
 	bh = drw->fonts->h + 2;
-	lines = MAX(lines, 0);
-	mh = (lines + 1) * bh;
 	{
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
 			    parentwin);
 		x = 0;
-		y = topbar ? 0 : wa.height - mh;
+		y = 0; 
 		mw = wa.width;
+		mh = wa.height;
 	}
-	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
-	inputw = mw / 3; /* input width: ~33% of monitor width */
+	lines = mh / bh - 1;
 	match();
 
 	/* create menu window */
@@ -671,66 +632,14 @@ setup(void)
 	                XNClientWindow, win, XNFocusWindow, win, NULL);
 
 	XMapRaised(dpy, win);
-	if (embed) {
-		XReparentWindow(dpy, win, parentwin, x, y);
-		XSelectInput(dpy, parentwin, FocusChangeMask | SubstructureNotifyMask);
-		if (XQueryTree(dpy, parentwin, &dw, &w, &dws, &du) && dws) {
-			for (i = 0; i < du && dws[i] != win; ++i)
-				XSelectInput(dpy, dws[i], FocusChangeMask);
-			XFree(dws);
-		}
-		grabfocus();
-	}
 	drw_resize(drw, mw, mh);
 	drawmenu();
-}
-
-static void
-usage(void)
-{
-	die("usage: menu [-bfiv] [-l lines] [-p prompt] [-fn font]\n"
-	    "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]");
 }
 
 int
 main(int argc, char *argv[])
 {
 	XWindowAttributes wa;
-	int i, fast = 0;
-
-	for (i = 1; i < argc; i++)
-		/* these options take no arguments */
-		if (!strcmp(argv[i], "-v")) {      /* prints version information */
-			puts("menu");
-			exit(0);
-		} else if (!strcmp(argv[i], "-b")) /* appears at the bottom of the screen */
-			topbar = 0;
-		else if (!strcmp(argv[i], "-f"))   /* grabs keyboard before reading stdin */
-			fast = 1;
-		else if (!strcmp(argv[i], "-i")) { /* case-insensitive item matching */
-			fstrncmp = strncasecmp;
-			fstrstr = cistrstr;
-		} else if (i + 1 == argc)
-			usage();
-		/* these options take one argument */
-		else if (!strcmp(argv[i], "-l"))   /* number of lines in vertical list */
-			lines = atoi(argv[++i]);
-		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
-			prompt = argv[++i];
-		else if (!strcmp(argv[i], "-fn"))  /* font or font set */
-			fonts[0] = argv[++i];
-		else if (!strcmp(argv[i], "-nb"))  /* normal background color */
-			colors[SchemeNorm][ColBg] = argv[++i];
-		else if (!strcmp(argv[i], "-nf"))  /* normal foreground color */
-			colors[SchemeNorm][ColFg] = argv[++i];
-		else if (!strcmp(argv[i], "-sb"))  /* selected background color */
-			colors[SchemeSel][ColBg] = argv[++i];
-		else if (!strcmp(argv[i], "-sf"))  /* selected foreground color */
-			colors[SchemeSel][ColFg] = argv[++i];
-		else if (!strcmp(argv[i], "-w"))   /* embedding window id */
-			embed = argv[++i];
-		else
-			usage();
 
 	if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
 		fputs("warning: no locale support\n", stderr);
@@ -738,8 +647,7 @@ main(int argc, char *argv[])
 		die("cannot open display");
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
-	if (!embed || !(parentwin = strtol(embed, NULL, 0)))
-		parentwin = root;
+	parentwin = root;
 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
 		die("could not get embedding window attributes: 0x%lx",
 		    parentwin);
@@ -748,13 +656,8 @@ main(int argc, char *argv[])
 		die("no fonts could be loaded.");
 	lrpad = drw->fonts->h;
 
-	if (fast && !isatty(0)) {
-		grabkeyboard();
-		readstdin();
-	} else {
-		readstdin();
-		grabkeyboard();
-	}
+	readstdin();
+	grabkeyboard();
 	setup();
 	run();
 

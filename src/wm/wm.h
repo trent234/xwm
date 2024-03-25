@@ -10,9 +10,9 @@ static const char col_black[] 		= "#000000";
 static const char col_white[] 		= "#FFFFFF";
 
 static const char *colors[][3] = {
-    /*               fg         bg         border   */
-    [SchemeNorm] = { col_black, col_white, col_black },
-    [SchemeSel]  = { col_white, col_black, col_white },
+    /*            		   fg         bg         border   */
+    [SchemeNorm]  	= { col_white, col_black, col_white },
+    [SchemeSel] 	= { col_black, col_white, col_black },
 };
 
 static const Rule rules[] = {
@@ -25,8 +25,8 @@ static const Rule rules[] = {
 static const int resizehints = 1;    /* 1 means respect size hints in tiled resizals */
 
 /* commands */
-static const char *launch_app[] = { "launch_app", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
-static const char *switch_app[] = { "switch_app", "-fn", dmenufont, "-nb", col_white, "-nf", col_black, "-sb", col_white, "-sf", col_black, NULL };
+static const char *launch_app[] = { "launch_app", NULL };
+static const char *switch_app[] = { "switch_app", NULL };
 static const char *termcmd[]  = { "uxterm", NULL };
 
 static const Key keys[] = {

@@ -1,4 +1,4 @@
-# Fork of dwm and menu 
+# Fork of dwm and dmenu, combined in one project 
 # See LICENSE file for copyright and license details.
 
 include config.mk
