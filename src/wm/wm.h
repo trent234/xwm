@@ -10,9 +10,9 @@ static const char col_black[] 		= "#000000";
 static const char col_white[] 		= "#FFFFFF";
 
 static const char *colors[][3] = {
-    /*               fg         bg         border   */
-    [SchemeNorm] = { col_black, col_white, col_black },
-    [SchemeSel]  = { col_white, col_black, col_white },
+    /*            		   fg         bg         border   */
+    [SchemeNorm]  	= { col_white, col_black, col_white },
+    [SchemeSel] 	= { col_black, col_white, col_black },
 };
 
 static const Rule rules[] = {

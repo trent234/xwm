@@ -6,8 +6,8 @@ static const char *fonts[] = {
 
 static const char *colors[SchemeLast][2] = {
 	/*     fg         bg       */
-	[SchemeNorm] = { "#bbbbbb", "#222222" },
-	[SchemeSel] = { "#eeeeee", "#005577" },
+	[SchemeNorm] = { "#000000", "#FFFFFF" },
+	[SchemeSel] = { "#FFFFFF", "#000000" },
 	[SchemeOut] = { "#000000", "#00ffff" },
 };
 

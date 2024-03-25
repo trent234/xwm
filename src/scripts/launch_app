@@ -2,15 +2,25 @@
 
 search_dirs="/usr/share/applications"
 apps=""
+first_app=true
 
 for dir in $search_dirs; do
-    for desktop_file in $(find $dir -name '*.desktop'); do
+    for desktop_file in $(find "$dir" -name '*.desktop'); do
+        # Skip .desktop files with NoDisplay=true
+        if grep -q '^NoDisplay=true' "$desktop_file"; then
+            continue
+        fi
         # extract the exec command, remove arguments and field codes
         exec_line=$(grep '^Exec=' "$desktop_file" | head -n 1 | sed 's/^Exec=//' | cut -d ' ' -f 1)
         if [ -n "$exec_line" ]; then
-            apps="$apps\n$exec_line"
+            if [ "$first_app" = true ]; then
+                apps="$exec_line"
+                first_app=false
+            else
+                apps="$apps\n$exec_line"
+            fi
         fi
     done
 done
 
-echo -e "$apps" | sort -u | menu "$@" | ${SHELL:-"/bin/sh"} &
+echo "$apps" | sort -u | menu | ${SHELL:-"/bin/sh"} &

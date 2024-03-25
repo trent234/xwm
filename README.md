@@ -14,6 +14,7 @@ Generally speaking these are the changes so far to dwm
 		* accepts request for a change in client selection
 		* these endpoints are used to enable app switching with dmenu
 	* Default behavior is monocle, while still permitting floating windows
+	* menu is now a window, list is size of window
 * Removed: 
 	* Multi-monitor support
 	* Tags
@@ -21,7 +22,10 @@ Generally speaking these are the changes so far to dwm
 	* Fullscreen (technically. in practice monocle is essentially fullscreen.)
 	* Layout indicator in bar
 
-I'm removing features partly as an exercise, but it has the benefit of reducing complexity, and certain features are incompatible with the new (simpler) program architecture. 
+I'm removing features partly as an exercise, but it has the benefit of reducing complexity, and certain features are incompatible with the new (simpler) program architecture.  
+
+dwm 2165 / wm 1582 SLOC  
+dmenu 796 / menu 665 SLOC 
 
 #### wm
 

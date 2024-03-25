@@ -598,14 +598,10 @@ drawbar()
 	x = 0;
 	if ((w = mon.ww - tw - x) > bh) {
 		if (mon.clients) {
-			/* better understand if this is now completely redundant */
-			/* drw_setscheme(drw, scheme[selmon == selmon ? SchemeSel : SchemeNorm]); */
-			drw_setscheme(drw, scheme[SchemeSel]);
 			drw_text(drw, x, 0, w, bh, lrpad / 2, mon.clients->name, 0);
 			if (mon.clients->isfloating)
 				drw_rect(drw, x + boxs, boxs, boxw, boxw, mon.clients->isfixed, 0);
 		} else {
-			drw_setscheme(drw, scheme[SchemeNorm]);
 			drw_rect(drw, x, 0, w, bh, 1, 1);
 		}
 	}
