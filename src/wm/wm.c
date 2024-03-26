@@ -26,21 +26,21 @@
 #include "../common/util.h"
 
 /* macros */
-#define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
-#define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
-#define LENGTH(X)               (sizeof X / sizeof X[0])
-#define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
-#define WIDTH(X)                ((X)->w + 2 * (X)->bw)
-#define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
-#define TEXTW(X)                (drw_fontset_getwidth(drw, (X)) + lrpad)
-#define SOCKET_PATH 			"/tmp/xwm"
-#define DELIMITER 				"\n"
+#define BUTTONMASK			(ButtonPressMask|ButtonReleaseMask)
+#define CLEANMASK(mask)		(mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
+#define LENGTH(X)			(sizeof X / sizeof X[0])
+#define MOUSEMASK			(BUTTONMASK|PointerMotionMask)
+#define WIDTH(X)			((X)->w + 2 * (X)->bw)
+#define HEIGHT(X)			((X)->h + 2 * (X)->bw)
+#define TEXTW(X)			(drw_fontset_getwidth(drw, (X)) + lrpad)
+#define SOCKET_PATH 		"/tmp/xwm"
+#define DELIMITER 			"\n"
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel }; /* color schemes */
 enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWindowType,
-       NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
+	   NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkStatusText, ClkWinTitle, ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
 enum {GetClients, SelectClient}; /* socket commands */
@@ -82,7 +82,7 @@ typedef struct {
 } Key;
 
 struct Monitor {
-	int by;               /* bar geometry */
+	int by;				  /* bar geometry */
 	int mx, my, mw, mh;   /* screen size */
 	int wx, wy, ww, wh;   /* window area  */
 	int showbar;
@@ -172,9 +172,9 @@ static int xerrorstart(Display *dpy, XErrorEvent *ee);
 static const char broken[] = "broken";
 static char stext[256];
 static int screen;
-static int sw, sh;           /* X display screen geometry width, height */
-static int bh;               /* bar height */
-static int lrpad;            /* sum of left and right padding for text */
+static int sw, sh;		   /* X display screen geometry width, height */
+static int bh;			   /* bar height */
+static int lrpad;			/* sum of left and right padding for text */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static char* (*shandler[2]) (char *) = {
@@ -221,7 +221,7 @@ applyrules(Client *c)
 	/* rule matching */
 	c->isfloating = 0;
 	XGetClassHint(dpy, c->win, &ch);
-	class    = ch.res_class ? ch.res_class : broken;
+	class	= ch.res_class ? ch.res_class : broken;
 	instance = ch.res_name  ? ch.res_name  : broken;
 
 	for (i = 0; i < LENGTH(rules); i++) {
@@ -356,13 +356,13 @@ buttonpress(XEvent *e)
 		XAllowEvents(dpy, ReplayPointer, CurrentTime);
 		click = ClkClientWin;
 	}
-	    for (i = 0; i < LENGTH(buttons); i++) {
-        if (click == buttons[i].click 
+		for (i = 0; i < LENGTH(buttons); i++) {
+		if (click == buttons[i].click 
 			&& buttons[i].func 
-            && buttons[i].button == ev->button
-            && CLEANMASK(buttons[i].mask) == CLEANMASK(ev->state)) 
-            	buttons[i].func(&buttons[i].arg);
-    }
+			&& buttons[i].button == ev->button
+			&& CLEANMASK(buttons[i].mask) == CLEANMASK(ev->state)) 
+				buttons[i].func(&buttons[i].arg);
+	}
 }
 
 void
@@ -408,13 +408,13 @@ cleanupmon()
 void
 clientmessage(XEvent *e)
 {
-    XClientMessageEvent *cme = &e->xclient;
-    Client *c = wintoclient(cme->window);
+	XClientMessageEvent *cme = &e->xclient;
+	Client *c = wintoclient(cme->window);
 
-    if (!c)
-        return;
-    if (cme->message_type == netatom[NetActiveWindow] && c != mon.clients && !c->isurgent)
-        seturgent(c, 1);
+	if (!c)
+		return;
+	if (cme->message_type == netatom[NetActiveWindow] && c != mon.clients && !c->isurgent)
+		seturgent(c, 1);
 }
 
 void
@@ -545,40 +545,40 @@ detach(Client *c)
 }
 
 static void dispatchsocketevent(void) {
-    int fd = accept(sockfd, NULL, NULL);
-    char buffer[1024] = {0};
-    ssize_t r_size, w_size;
+	int fd = accept(sockfd, NULL, NULL);
+	char buffer[1024] = {0};
+	ssize_t r_size, w_size;
 
-    if (fd < 0)
-        return;
+	if (fd < 0)
+		return;
 
 	/* read in request */
-    r_size = read(fd, buffer, sizeof(buffer) - 1);
+	r_size = read(fd, buffer, sizeof(buffer) - 1);
 	if (r_size <= 0) {
-        close(fd);
-        return;
-    }
-    buffer[r_size] = '\0';  
+		close(fd);
+		return;
+	}
+	buffer[r_size] = '\0';  
 
-    /* socket protocol is- request \n payload */
-    char *sevent_str = strtok(buffer, DELIMITER);
-    char *payload = strtok(NULL, DELIMITER);
+	/* socket protocol is- request \n payload */
+	char *sevent_str = strtok(buffer, DELIMITER);
+	char *payload = strtok(NULL, DELIMITER);
 
-    if (sevent_str != NULL) {
-        int sevent = atoi(sevent_str);
+	if (sevent_str != NULL) {
+		int sevent = atoi(sevent_str);
 		/* check if the event is within the bounds of the handler array */
-        if (sevent >= 0 && sevent < sizeof(shandler) / sizeof(shandler[0])) {
+		if (sevent >= 0 && sevent < sizeof(shandler) / sizeof(shandler[0])) {
 			/* call handler and write response if one exists */
-            char *ret = shandler[sevent](payload);
-            if (ret) {
-                w_size = write(fd, ret, strlen(ret));
+			char *ret = shandler[sevent](payload);
+			if (ret) {
+				w_size = write(fd, ret, strlen(ret));
 				if(w_size < 0) 
 					perror("write error");
 			}
 		}
 	}
-    memset(buffer, 0, sizeof(buffer)); 
-    close(fd);
+	memset(buffer, 0, sizeof(buffer)); 
+	close(fd);
 }
 
 void
@@ -683,18 +683,18 @@ getatomprop(Client *c, Atom prop)
 
 char* 
 getclients(char *unused) {
-    static char buf[4096];
-    int i = 0;
-    buf[0] = '\0'; 
+	static char buf[4096];
+	int i = 0;
+	buf[0] = '\0'; 
 
-    for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
-        /* Ensure buffer doesn't overflow, account for number length, 
+	for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
+		/* Ensure buffer doesn't overflow, account for number length, 
 		name length, 2 extra chars for space and newline */
-        if (strlen(buf) + strlen(c->name) + 10 > sizeof(buf)) 
-            break; 
-        snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%d %s\n", i, c->name);
-    }
-    return buf;
+		if (strlen(buf) + strlen(c->name) + 10 > sizeof(buf)) 
+			break; 
+		snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), "%d %s\n", i, c->name);
+	}
+	return buf;
 }
 
 int
@@ -848,7 +848,7 @@ manage(Window w, XWindowAttributes *wa)
 
 	updatetitle(c);
 	if (!(XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))))
-    	applyrules(c);
+		applyrules(c);
 
 	if (c->x + WIDTH(c) > mon.wx + mon.ww)
 		c->x = mon.wx + mon.ww - WIDTH(c);
@@ -1033,38 +1033,38 @@ resizemouse(const Arg *arg)
 }
 
 void run(void) {
-    XEvent ev;
-    int xfd, timeout;
-    struct pollfd fds[2];
+	XEvent ev;
+	int xfd, timeout;
+	struct pollfd fds[2];
 
-    xfd = ConnectionNumber(dpy);
-    timeout = 100; // Poll timeout in milliseconds
+	xfd = ConnectionNumber(dpy);
+	timeout = 100; // Poll timeout in milliseconds
 
    /* Initialize pollfd structure */
-    fds[0].fd = xfd;
-    fds[0].events = POLLIN; // Check for data to read from X server
-    fds[1].fd = sockfd;
-    fds[1].events = POLLIN; // Check for data to read from socket
+	fds[0].fd = xfd;
+	fds[0].events = POLLIN; // Check for data to read from X server
+	fds[1].fd = sockfd;
+	fds[1].events = POLLIN; // Check for data to read from socket
 
-    /* main event loop */
-    XSync(dpy, False);
-    while (running) {
-        /* Poll the set of file descriptors */
-        int num_ready = poll(fds, 2, timeout);
-        if (num_ready > 0) {
-            /* Check for X events without blocking */
-            while (XPending(dpy)) {
-                XNextEvent(dpy, &ev);
-                if (xhandler[ev.type]) {
-                    xhandler[ev.type](&ev);
-                }
-            }
-            /* Handle socket event */
-            if (fds[1].revents & POLLIN) {
-                dispatchsocketevent();
-            }
-        }
-    }
+	/* main event loop */
+	XSync(dpy, False);
+	while (running) {
+		/* Poll the set of file descriptors */
+		int num_ready = poll(fds, 2, timeout);
+		if (num_ready > 0) {
+			/* Check for X events without blocking */
+			while (XPending(dpy)) {
+				XNextEvent(dpy, &ev);
+				if (xhandler[ev.type]) {
+					xhandler[ev.type](&ev);
+				}
+			}
+			/* Handle socket event */
+			if (fds[1].revents & POLLIN) {
+				dispatchsocketevent();
+			}
+		}
+	}
 }
 
 void
@@ -1097,20 +1097,20 @@ scan(void)
 char*
 selectclient(char *body)
 {
-    int index, i = 0;
+	int index, i = 0;
 
-    if (body == NULL || (index = atoi(body)) < 0) 
+	if (body == NULL || (index = atoi(body)) < 0) 
 		return NULL;
 
-    /* Iterate through clients to find the requested one */
-    for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
-        if (i == index) {
+	/* Iterate through clients to find the requested one */
+	for (Client *c = mon.clients; c != NULL; c = c->next, ++i) {
+		if (i == index) {
 			focus(c);
 			arrange();
 			return c->name;
 		}
-    }
-    return NULL;
+	}
+	return NULL;
 }
 
 void
@@ -1240,34 +1240,34 @@ setup(void)
 
 void
 setupsocket(void) {
-    struct sockaddr_un addr;
+	struct sockaddr_un addr;
 
-    /* Create a socket */
-    if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) 
-        die("socket failed");
+	/* Create a socket */
+	if ((sockfd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) 
+		die("socket failed");
 
-    /* Set socket to non-blocking */
-    int flags = fcntl(sockfd, F_GETFL, 0);
-    if (flags < 0) 
-        die("fcntl(F_GETFL) failed");
-    if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
-        die("fcntl(F_SETFL) failed");
+	/* Set socket to non-blocking */
+	int flags = fcntl(sockfd, F_GETFL, 0);
+	if (flags < 0) 
+		die("fcntl(F_GETFL) failed");
+	if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) < 0)
+		die("fcntl(F_SETFL) failed");
 
-    /* Remove the socket file if it already exists */
-    unlink(SOCKET_PATH);
+	/* Remove the socket file if it already exists */
+	unlink(SOCKET_PATH);
 
-    /* Set the socket address */
-    memset(&addr, 0, sizeof(addr));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
+	/* Set the socket address */
+	memset(&addr, 0, sizeof(addr));
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
-    /* Bind the socket to the address */
-    if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) 
-        die("bind failed");
+	/* Bind the socket to the address */
+	if (bind(sockfd, (struct sockaddr *)&addr, sizeof(addr)) < 0) 
+		die("bind failed");
 
-    /* Listen for incoming connections */
-    if (listen(sockfd, SOMAXCONN) < 0) 
-        die("listen failed");
+	/* Listen for incoming connections */
+	if (listen(sockfd, SOMAXCONN) < 0) 
+		die("listen failed");
 }
 
 void
