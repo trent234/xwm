@@ -88,3 +88,65 @@ do
 done &
 exec wm
 ```
+
+
+## Developing & debugging
+
+I use virtualbox with a virtual NAT as the integral component of the build-run cycle. Create a debian 12 VM and note its IP. 
+From the host, within the repo parent run-  
+```
+scp -r xwm user@192.168.122.35:/tmp
+```
+Then I can SSH to the VM like so-  
+```
+ssh user@192.168.122.35  
+```
+For a new VM certain packages will be required- 
+* To pull
+  * git
+* Project dependencies
+  * libx11-dev
+  * libxft-dev
+* To build
+  * make
+  * gcc
+* To run
+  * xorg
+* To debug
+  * gdb
+  * gdbserver
+  * valgrind
+* To populate many apps to test with
+  * gnome
+* Missing deps for some gnome apps
+  * dbus-launch  
+
+SSH'd into the VM, move the source that was copied over to the same dir path as on the host (required for gdb)- 
+```
+mv /tmp/xwm /path/to/host/repo/dir
+```
+Create an ~/.xinitrc with these contents-
+```
+vi ~/.xinitrc
+exec gdbserver 192.168.122.35:5555 wm > /var/log/wm 2>&1
+```
+And in a separate terminal SSH'd in to the VM run- 
+```
+touch /var/log/wm
+tail -f /var/log/wm
+```
+Then, in a separate terminal SSH'd into the VM, start the wm with-
+```
+startx
+```
+Then on the host, from the repo root dir-
+```
+gdb -tui
+target remote 192.168.122.35:5555
+continue
+```
+At this point you'll have three essential windows-
+* A VM running the wm
+* A terminal tailing the logs for the wm and its child processes
+* A terminal with gdb remotely attached to wm
+And that's all you need to debug. Be sure the host repo root has the same version of build output as on remote. That is needed for gdb.  

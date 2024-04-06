@@ -830,6 +830,15 @@ killclient(const Arg *arg)
 	}
 }
 
+int
+logXErrors(Display *dpy, XErrorEvent *e) {
+    char errorMsg[256];
+    XGetErrorText(dpy, e->error_code, errorMsg, sizeof(errorMsg));
+    fprintf(stderr, "X Error: %s (Code: %d, Request: %d, Minor: %d)\n", 
+		errorMsg, e->error_code, e->request_code, e->minor_code);
+    return 0; 
+}
+
 void
 manage(Window w, XWindowAttributes *wa)
 {
@@ -1166,6 +1175,8 @@ setup(void)
 	XSetWindowAttributes wa;
 	Atom utf8string;
 	struct sigaction sa;
+
+	XSetErrorHandler(logXErrors);
 
 	/* do not transform children into zombies when they terminate */
 	sigemptyset(&sa.sa_mask);
