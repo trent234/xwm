@@ -19,14 +19,14 @@
 
 /* macros */
 #define INTERSECT(x,y,w,h,r)  (MAX(0, MIN((x)+(w),(r).x_org+(r).width)  - MAX((x),(r).x_org)) \
-                             * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
-#define LENGTH(X)               (sizeof X / sizeof X[0])
-#define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+							 * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
+#define LENGTH(X)			  (sizeof X / sizeof X[0])
+#define TEXTW(X)			  (drw_fontset_getwidth(drw, (X)) + lrpad)
 
 /* enums */
 enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
-enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWindowType,
-       NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
+enum { NetSupported, NetWMName, NetWMState, NetWMCheck,	NetActiveWindow, NetWMWindowType,
+	   NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 
 struct item {
 	char *text;
@@ -36,12 +36,14 @@ struct item {
 
 /* function declarations */
 static void appenditem(struct item *item, struct item **list, struct item **last);
+static void buttonpress(XButtonEvent *ev);
 static void calcoffsets(void);
 static void cleanup(void);
 static int drawitem(struct item *item, int x, int y, int w);
 static void drawmenu(void);
 static void grabfocus(void);
 static void	grabkeyboard(void);
+static void hover(XMotionEvent *ev);
 static void	match(void);
 static void insert(const char *str, ssize_t n);
 static size_t nextrune(int inc);
@@ -87,6 +89,19 @@ appenditem(struct item *item, struct item **list, struct item **last)
 	item->left = *last;
 	item->right = NULL;
 	*last = item;
+}
+
+static void buttonpress(XButtonEvent *ev) {
+	struct item *item;
+	int y = bh;
+
+	for (item = curr; item != next; item = item->right, y += bh) {
+		if (ev->y >= y && ev->y < y + bh) {
+			puts(item->text);
+			cleanup();
+			exit(0);
+		}
+	}
 }
 
 static void
@@ -142,7 +157,7 @@ drawmenu(void)
 
 	drw_setscheme(drw, scheme[SchemeNorm]);
 
-    /* Clear the entire window */
+	/* Clear the entire window */
 	drw_rect(drw, 0, 0, mw, mh, 1, 1);
 
 	/* draw input field */
@@ -186,11 +201,26 @@ grabkeyboard(void)
 	/* try to grab keyboard, we may have to wait for another process to ungrab */
 	for (i = 0; i < 1000; i++) {
 		if (XGrabKeyboard(dpy, DefaultRootWindow(dpy), True, GrabModeAsync,
-		                  GrabModeAsync, CurrentTime) == GrabSuccess)
+						  GrabModeAsync, CurrentTime) == GrabSuccess)
 			return;
 		nanosleep(&ts, NULL);
 	}
 	die("cannot grab keyboard");
+}
+
+static void hover(XMotionEvent *ev) {
+	struct item *item;
+	int y = bh;
+
+	for (item = curr; item != next; item = item->right, y += bh) {
+		if (ev->y >= y && ev->y < y + bh) {
+			if (sel != item) {
+				sel = item;
+				drawmenu(); // Redraw menu to update selection highlight
+			}
+			break;
+		}
+	}
 }
 
 static void
@@ -308,21 +338,21 @@ keypress(XKeyEvent *ev)
 
 	if (ev->state & ControlMask) {
 		switch(ksym) {
-		case XK_a: ksym = XK_Home;      break;
-		case XK_b: ksym = XK_Left;      break;
-		case XK_c: ksym = XK_Escape;    break;
-		case XK_d: ksym = XK_Delete;    break;
-		case XK_e: ksym = XK_End;       break;
-		case XK_f: ksym = XK_Right;     break;
-		case XK_g: ksym = XK_Escape;    break;
+		case XK_a: ksym = XK_Home;	  break;
+		case XK_b: ksym = XK_Left;	  break;
+		case XK_c: ksym = XK_Escape;	break;
+		case XK_d: ksym = XK_Delete;	break;
+		case XK_e: ksym = XK_End;	   break;
+		case XK_f: ksym = XK_Right;	 break;
+		case XK_g: ksym = XK_Escape;	break;
 		case XK_h: ksym = XK_BackSpace; break;
-		case XK_i: ksym = XK_Tab;       break;
+		case XK_i: ksym = XK_Tab;	   break;
 		case XK_j: /* fallthrough */
 		case XK_J: /* fallthrough */
 		case XK_m: /* fallthrough */
 		case XK_M: ksym = XK_Return; ev->state &= ~ControlMask; break;
-		case XK_n: ksym = XK_Down;      break;
-		case XK_p: ksym = XK_Up;        break;
+		case XK_n: ksym = XK_Down;	  break;
+		case XK_p: ksym = XK_Up;		break;
 
 		case XK_k: /* delete right */
 			text[cursor] = '\0';
@@ -340,7 +370,7 @@ keypress(XKeyEvent *ev)
 		case XK_y: /* paste selection */
 		case XK_Y:
 			XConvertSelection(dpy, (ev->state & ShiftMask) ? clip : XA_PRIMARY,
-			                  utf8, utf8, win, CurrentTime);
+							  utf8, utf8, win, CurrentTime);
 			return;
 		case XK_Left:
 		case XK_KP_Left:
@@ -369,7 +399,7 @@ keypress(XKeyEvent *ev)
 			goto draw;
 		case XK_g: ksym = XK_Home;  break;
 		case XK_G: ksym = XK_End;   break;
-		case XK_h: ksym = XK_Up;    break;
+		case XK_h: ksym = XK_Up;	break;
 		case XK_j: ksym = XK_Next;  break;
 		case XK_k: ksym = XK_Prior; break;
 		case XK_l: ksym = XK_Down;  break;
@@ -502,8 +532,8 @@ paste(void)
 
 	/* we have been given the current selection, now insert it into input */
 	if (XGetWindowProperty(dpy, win, utf8, 0, (sizeof text / 4) + 1, False,
-	                   utf8, &da, &di, &dl, &dl, (unsigned char **)&p)
-	    == Success && p) {
+					   utf8, &da, &di, &dl, &dl, (unsigned char **)&p)
+		== Success && p) {
 		insert(p, (q = strchr(p, '\n')) ? q - p : (ssize_t)strlen(p));
 		XFree(p);
 	}
@@ -571,6 +601,12 @@ run(void)
 			if (ev.xvisibility.state != VisibilityUnobscured)
 				XRaiseWindow(dpy, win);
 			break;
+		case MotionNotify:
+			hover(&ev.xmotion);
+			break;
+		case ButtonPress:
+			buttonpress(&ev.xbutton);
+			break;
 		}
 	}
 }
@@ -604,7 +640,7 @@ setup(void)
 	{
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
-			    parentwin);
+				parentwin);
 		x = 0;
 		y = 0; 
 		mw = wa.width;
@@ -617,9 +653,10 @@ setup(void)
 	swa.override_redirect = False;
 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+	swa.event_mask |= ButtonPressMask | PointerMotionMask;
 	win = XCreateWindow(dpy, root, x, y, mw, mh, 0,
-	                    CopyFromParent, CopyFromParent, CopyFromParent,
-	                    CWBackPixel | CWEventMask, &swa);
+						CopyFromParent, CopyFromParent, CopyFromParent,
+						CWBackPixel | CWEventMask, &swa);
 	XSetClassHint(dpy, win, &ch);
 	XChangeProperty(dpy, win, netatom[NetWMName], utf8, 8,
 		PropModeReplace, (unsigned char *) "Menu", 4);
@@ -629,7 +666,7 @@ setup(void)
 		die("XOpenIM failed: could not open input device");
 
 	xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
-	                XNClientWindow, win, XNFocusWindow, win, NULL);
+					XNClientWindow, win, XNFocusWindow, win, NULL);
 
 	XMapRaised(dpy, win);
 	drw_resize(drw, mw, mh);
@@ -650,7 +687,7 @@ main(int argc, char *argv[])
 	parentwin = root;
 	if (!XGetWindowAttributes(dpy, parentwin, &wa))
 		die("could not get embedding window attributes: 0x%lx",
-		    parentwin);
+			parentwin);
 	drw = drw_create(dpy, screen, root, wa.width, wa.height);
 	if (!drw_fontset_create(drw, fonts, LENGTH(fonts)))
 		die("no fonts could be loaded.");
