@@ -1,0 +1,10 @@
+#!/bin/sh
+# Overview: This script displays a confirmation menu using the existing "menu" command.
+SOCKET_PATH="/tmp/xwm"
+QUIT_COMMAND=3
+
+# If the user selects "yes", it sends the Quit event via the Unix domain socket.
+CHOICE=$(printf "yes\nno\n" | menu -p 'Quit WM: ')
+if [ "$CHOICE" = "yes" ]; then
+    printf "%s\n" "${QUIT_COMMAND}" | nc -U "${SOCKET_PATH}"
+fi

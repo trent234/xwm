@@ -26,15 +26,15 @@
 #include "../common/util.h"
 
 /* macros */
-#define BUTTONMASK			(ButtonPressMask|ButtonReleaseMask)
+#define BUTTONMASK		(ButtonPressMask|ButtonReleaseMask)
 #define CLEANMASK(mask)		(mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
-#define LENGTH(X)			(sizeof X / sizeof X[0])
-#define MOUSEMASK			(BUTTONMASK|PointerMotionMask)
-#define WIDTH(X)			((X)->w + 2 * (X)->bw)
-#define HEIGHT(X)			((X)->h + 2 * (X)->bw)
-#define TEXTW(X)			(drw_fontset_getwidth(drw, (X)) + lrpad)
+#define LENGTH(X)		(sizeof X / sizeof X[0])
+#define MOUSEMASK		(BUTTONMASK|PointerMotionMask)
+#define WIDTH(X)		((X)->w + 2 * (X)->bw)
+#define HEIGHT(X)		((X)->h + 2 * (X)->bw)
+#define TEXTW(X)		(drw_fontset_getwidth(drw, (X)) + lrpad)
 #define SOCKET_PATH 		"/tmp/xwm"
-#define DELIMITER 			"\n"
+#define DELIMITER 		"\n"
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
@@ -43,7 +43,7 @@ enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWin
 	   NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkStatusText, ClkWinTitle, ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
-enum {GetClients, SelectClient}; /* socket commands */
+enum {GetClients, SelectClient, StateDump, Quit}; /* socket commands */
 
 typedef union {
 	int i;
@@ -67,7 +67,7 @@ struct Client {
 	float mina, maxa;
 	int x, y, w, h;
 	int oldx, oldy, oldw, oldh;
-	int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
+	int basew, baseh, incw, inch, hintsvalid;
 	int bw, oldbw;
 	int isfixed, isfloating, isurgent, neverfocus;
 	Client *next;
@@ -82,31 +82,20 @@ typedef struct {
 } Key;
 
 struct Monitor {
-	int by;				  /* bar geometry */
-	int mx, my, mw, mh;   /* screen size */
-	int wx, wy, ww, wh;   /* window area  */
+	int by;			/* bar geometry */
+	int mx, my, mw, mh;   	/* screen size */
+	int wx, wy, ww, wh;   	/* window area  */
 	int showbar;
 	Client *clients;
 	Window barwin;
 };
 
-typedef struct {
-	const char *class;
-	const char *instance;
-	const char *title;
-	unsigned int tags;
-	int isfloating;
-} Rule;
-
 /* function declarations */
-static void applyrules(Client *c);
-static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact);
 static void arrange(void);
 static void attach(Client *c);
 static void buttonpress(XEvent *e);
 static void checkotherwm(void);
 static void cleanup(void);
-static void cleanupmon(void);
 static void clientmessage(XEvent *e);
 static void configure(Client *c);
 static void configurenotify(XEvent *e);
@@ -121,7 +110,7 @@ static void expose(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static Atom getatomprop(Client *c, Atom prop);
-static char* getclients(char *body); /* param is payload only for socket setters */
+static char* getclients(char *unused); 
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
@@ -133,12 +122,11 @@ static void manage(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
 static void movemouse(const Arg *arg);
-static Client *nexttiled(Client *c);
 static void propertynotify(XEvent *e);
-static void quit(const Arg *arg);
-static void resize(Client *c, int x, int y, int w, int h, int interact);
-static void resizeclient(Client *c, int x, int y, int w, int h);
+static char* quit(char* unused);
+static void resize(Client *c, int x, int y, int w, int h);
 static void resizemouse(const Arg *arg);
+static void restack(void);
 static void run(void);
 static void scan(void);
 static int sendevent(Client *c, Atom proto);
@@ -149,6 +137,7 @@ static void setup(void);
 static void setupsocket(void);
 static void seturgent(Client *c, int urg);
 static void spawn(const Arg *arg);
+static char* statedump(char *unused);
 static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void unfocus(Client *c, int setfocus);
@@ -158,7 +147,6 @@ static void updatebarpos(void);
 static void updateclientlist(void);
 static int updategeom(void);
 static void updatenumlockmask(void);
-static void updatesizehints(Client *c);
 static void updatestatus(void);
 static void updatetitle(Client *c);
 static void updatewindowtype(Client *c);
@@ -177,9 +165,11 @@ static int bh;			   /* bar height */
 static int lrpad;			/* sum of left and right padding for text */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
-static char* (*shandler[2]) (char *) = {
+static char* (*shandler[4]) (char *) = {
 	[GetClients] = getclients,
-	[SelectClient] = selectclient, /* this is an existing function. assuming behavior will need to be modified */
+	[SelectClient] = selectclient, 
+	[StateDump] = statedump,
+	[Quit] = quit
 };
 static void (*xhandler[LASTEvent]) (XEvent *) = {
 	[ButtonPress] = buttonpress,
@@ -209,140 +199,108 @@ static Window root, wmcheckwin;
 /* configuration, allows nested code to access above variables */
 #include "wm.h"
 
-/* function implementations */
-void
-applyrules(Client *c)
-{
-	const char *class, *instance;
-	unsigned int i;
-	const Rule *r;
-	XClassHint ch = { NULL, NULL };
-
-	/* rule matching */
-	c->isfloating = 0;
-	XGetClassHint(dpy, c->win, &ch);
-	class	= ch.res_class ? ch.res_class : broken;
-	instance = ch.res_name  ? ch.res_name  : broken;
-
-	for (i = 0; i < LENGTH(rules); i++) {
-		r = &rules[i];
-		if ((!r->title || strstr(c->name, r->title))
-		&& (!r->class || strstr(class, r->class))
-		&& (!r->instance || strstr(instance, r->instance)))
-		{
-			c->isfloating = r->isfloating;
-		}
-	}
-	if (ch.res_class)
-		XFree(ch.res_class);
-	if (ch.res_name)
-		XFree(ch.res_name);
-}
-
-int
-applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact)
-{
-	int baseismin;
-
-	/* set minimum possible */
-	*w = MAX(1, *w);
-	*h = MAX(1, *h);
-	if (interact) {
-		if (*x > sw)
-			*x = sw - WIDTH(c);
-		if (*y > sh)
-			*y = sh - HEIGHT(c);
-		if (*x + *w + 2 * c->bw < 0)
-			*x = 0;
-		if (*y + *h + 2 * c->bw < 0)
-			*y = 0;
-	} else {
-		if (*x >= mon.wx + mon.ww)
-			*x = mon.wx + mon.ww - WIDTH(c);
-		if (*y >= mon.wy + mon.wh)
-			*y = mon.wy + mon.wh - HEIGHT(c);
-		if (*x + *w + 2 * c->bw <= mon.wx)
-			*x = mon.wx;
-		if (*y + *h + 2 * c->bw <= mon.wy)
-			*y = mon.wy;
-	}
-	if (*h < bh)
-		*h = bh;
-	if (*w < bh)
-		*w = bh;
-	if (resizehints || c->isfloating) {
-		if (!c->hintsvalid)
-			updatesizehints(c);
-		/* see last two sentences in ICCCM 4.1.2.3 */
-		baseismin = c->basew == c->minw && c->baseh == c->minh;
-		if (!baseismin) { /* temporarily remove base dimensions */
-			*w -= c->basew;
-			*h -= c->baseh;
-		}
-		/* adjust for aspect limits */
-		if (c->mina > 0 && c->maxa > 0) {
-			if (c->maxa < (float)*w / *h)
-				*w = *h * c->maxa + 0.5;
-			else if (c->mina < (float)*h / *w)
-				*h = *w * c->mina + 0.5;
-		}
-		if (baseismin) { /* increment calculation requires this */
-			*w -= c->basew;
-			*h -= c->baseh;
-		}
-		/* adjust for increment value */
-		if (c->incw)
-			*w -= *w % c->incw;
-		if (c->inch)
-			*h -= *h % c->inch;
-		/* restore base dimensions */
-		*w = MAX(*w + c->basew, c->minw);
-		*h = MAX(*h + c->baseh, c->minh);
-		if (c->maxw)
-			*w = MIN(*w, c->maxw);
-		if (c->maxh)
-			*h = MIN(*h, c->maxh);
-	}
-	return *x != c->x || *y != c->y || *w != c->w || *h != c->h;
-}
-
+/*
+ * arrange() - This function orchestrates the layout updates for client windows.
+ * It is a critical part of the window manager's main event loop, ensuring that
+ * the arrangement of windows reflects both the current screen geometry and client
+ * states. This design prioritizes responsiveness by keeping the layout recalculations
+ * lightweight, which is essential for smooth user interactions.
+ */
 void
 arrange()
 {
-	Client *c;
+	Client *c, *next;
+	Client *tiled = NULL, *tlast = NULL;
+	Client *floating = NULL, *flast = NULL;
 	XEvent ev;
-	XWindowChanges wc;
 
 	drawbar();
 	if (!mon.clients)
 		return;
-	if (mon.clients->isfloating)
-		XRaiseWindow(dpy, mon.clients->win);
-	wc.stack_mode = Below;
-	wc.sibling = mon.barwin;
-	for (c = nexttiled(mon.clients); c; c = nexttiled(c->next)) {
-		resize(c, mon.wx, mon.wy, mon.ww - 2 * c->bw, mon.wh - 2 * c->bw, 0);
-		XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-		wc.sibling = c->win;
+	
+	/* Partition clients into tiled and floating lists */
+	for (c = mon.clients; c; c = next) {
+		next = c->next;
+		c->next = NULL;
+		if (c->isfloating) {
+			if (!floating) {
+				floating = c;
+				flast = c;
+			} else {
+				flast->next = c;
+				flast = c;
+			}
+		} else {
+			if (!tiled) {
+				tiled = c;
+				tlast = c;
+			} else {
+				tlast->next = c;
+				tlast = c;
+			}
+		}
 	}
-	XSync(dpy, False);
+	/* Merge lists: floating clients first, then tiled clients */
+	if (floating) {
+		mon.clients = floating;
+		flast->next = tiled;
+	} else {
+		mon.clients = tiled;
+	}
+
+	restack();
+
 	while (XCheckMaskEvent(dpy, EnterWindowMask, &ev));
 }
 
 void
 attach(Client *c)
 {
-	c->next = mon.clients;
-	mon.clients = c;
+    // For floating clients, add them to the head of the list.
+    if (c->isfloating) {
+        c->next = mon.clients;
+        mon.clients = c;
+        return;
+    }
+
+    // For tiled clients and no other clients, add to the head of the list too. 
+    if (!mon.clients) {
+        mon.clients = c;
+        c->next = NULL;
+        return;
+    }
+
+    Client *lastFloatingClient = NULL;
+    Client *current = mon.clients;
+
+    // Traverse the list to find the last floating client.
+    while (current && current->isfloating) {
+        lastFloatingClient = current;
+        current = current->next;
+    }
+
+    if (lastFloatingClient) {
+        // Insert new tiled client after the last floating client.
+        c->next = lastFloatingClient->next;
+        lastFloatingClient->next = c;
+    } else {
+        // No floating clients found, add new client at the beginning.
+        c->next = mon.clients;
+        mon.clients = c;
+    }
 }
 
+/*
+ * buttonpress() - Centralizes the dispatching of mouse button events.
+ */
 void
 buttonpress(XEvent *e)
 {
 	unsigned int i, x, click;
 	Client *c;
 	XButtonPressedEvent *ev = &e->xbutton;
-
+	fprintf(stderr, "ButtonPress captured: button=%d, state=%u, x=%d, y=%d\n", ev->button, ev->state, ev->x, ev->y);
+	
 	click = ClkRootWin;
 	if (ev->window == mon.barwin) {
 		i = x = 0;
@@ -365,6 +323,7 @@ buttonpress(XEvent *e)
 	}
 }
 
+/* checkotherwm() - Ensures exclusive control over the X server. */
 void
 checkotherwm(void)
 {
@@ -382,11 +341,13 @@ cleanup(void)
 	size_t i;
 
 	close(sockfd);
+	unlink(SOCKET_PATH);
 	while (mon.clients)
 		unmanage(mon.clients, 0);
 	focus(NULL);
 	XUngrabKey(dpy, AnyKey, AnyModifier, root);
-	cleanupmon();
+	XUnmapWindow(dpy, mon.barwin);
+	XDestroyWindow(dpy, mon.barwin);
 	for (i = 0; i < CurLast; i++)
 		drw_cur_free(drw, cursor[i]);
 	for (i = 0; i < LENGTH(colors); i++)
@@ -399,12 +360,10 @@ cleanup(void)
 	XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 }
 
-void
-cleanupmon()
-{
-	XUnmapWindow(dpy, mon.barwin);
-	XDestroyWindow(dpy, mon.barwin);
-}
+/*
+ * clientmessage() - Dispatches client messages to update WM state.
+ * Processes activation and urgency hints for consistent behavior.
+ */
 void
 clientmessage(XEvent *e)
 {
@@ -417,6 +376,10 @@ clientmessage(XEvent *e)
 		seturgent(c, 1);
 }
 
+/*
+ * configure() - Syncs client's state by sending a ConfigureNotify event.
+ * Centralizes state updates for consistent window management.
+ */
 void
 configure(Client *c)
 {
@@ -436,6 +399,11 @@ configure(Client *c)
 	XSendEvent(dpy, c->win, False, StructureNotifyMask, (XEvent *)&ce);
 }
 
+/*
+ * configurenotify() - Handles configuration notifications from the X server.
+ * This function is critical as it dynamically adjusts the window manager's
+ * geometry and layout in response to changes in the root window's size.
+ */
 void
 configurenotify(XEvent *e)
 {
@@ -457,6 +425,13 @@ configurenotify(XEvent *e)
 	}
 }
 
+/*
+ * configurerequest() - Handles client configuration requests.
+ * This function plays a critical role in the dynamic adjustment of window layouts.
+ * The decision to process these requests immediately here ensures that client
+ * modifications adhere to WM constraints, preserving consistent state and responsiveness
+ * across the system’s event loop.
+ */
 void
 configurerequest(XEvent *e)
 {
@@ -465,35 +440,17 @@ configurerequest(XEvent *e)
 	XWindowChanges wc;
 
 	if ((c = wintoclient(ev->window))) {
-		if (ev->value_mask & CWBorderWidth)
-			c->bw = ev->border_width;
-		else if (c->isfloating) {
-			if (ev->value_mask & CWX) {
-				c->oldx = c->x;
-				c->x = mon.mx + ev->x;
-			}
-			if (ev->value_mask & CWY) {
-				c->oldy = c->y;
-				c->y = mon.my + ev->y;
-			}
-			if (ev->value_mask & CWWidth) {
-				c->oldw = c->w;
-				c->w = ev->width;
-			}
-			if (ev->value_mask & CWHeight) {
-				c->oldh = c->h;
-				c->h = ev->height;
-			}
-			if ((c->x + c->w) > mon.mx + mon.mw && c->isfloating)
-				c->x = mon.mx + (mon.mw / 2 - WIDTH(c) / 2); /* center in x direction */
-			if ((c->y + c->h) > mon.my + mon.mh && c->isfloating)
-				c->y = mon.my + (mon.mh / 2 - HEIGHT(c) / 2); /* center in y direction */
-			if ((ev->value_mask & (CWX|CWY)) && !(ev->value_mask & (CWWidth|CWHeight)))
-				configure(c);
-			XMoveResizeWindow(dpy, c->win, c->x, c->y, c->w, c->h);
-		} else
-			configure(c);
-	} else {
+		if (c->isfloating) {
+			int x = c->x, y = c->y, w = c->w, h = c->h;
+
+			if (ev->value_mask & CWX)       x = mon.mx + ev->x;
+			if (ev->value_mask & CWY)       y = mon.my + ev->y;
+			if (ev->value_mask & CWWidth)   w = ev->width;
+			if (ev->value_mask & CWHeight)  h = ev->height;
+	
+			resize(c, x, y, w, h);
+		}
+	} else { /* Rer ICCCM unclaimed windows should not be blocked, so forward it. */
 		wc.x = ev->x;
 		wc.y = ev->y;
 		wc.width = ev->width;
@@ -525,6 +482,10 @@ createbar(void)
 	}
 }
 
+/*
+ * destroynotify() - Handles window destruction events.
+ * Removes a client promptly to prevent stale states.
+ */
 void
 destroynotify(XEvent *e)
 {
@@ -535,6 +496,11 @@ destroynotify(XEvent *e)
 		unmanage(c, 1);
 }
 
+/*
+ * detach() - Removes the specified client from the monitor's client list.
+ * This function is a critical utility that maintains the internal ordering of
+ * clients by unlinking the given client from the list. 
+ */
 void
 detach(Client *c)
 {
@@ -544,6 +510,12 @@ detach(Client *c)
 	*tc = c->next;
 }
 
+/*
+ * dispatchsocketevent() - Centralizes the processing of incoming socket events.
+ * This function is critical because it integrates external IPC requests into the
+ * WM's core event loop, allowing remote commands to dynamically influence the state
+ * and configuration of the window manager. 
+ */
 static void dispatchsocketevent(void) {
 	int fd = accept(sockfd, NULL, NULL);
 	char buffer[1024] = {0};
@@ -571,9 +543,17 @@ static void dispatchsocketevent(void) {
 			/* call handler and write response if one exists */
 			char *ret = shandler[sevent](payload);
 			if (ret) {
-				w_size = write(fd, ret, strlen(ret));
-				if(w_size < 0) 
-					perror("write error");
+				size_t total_written = 0, len = strlen(ret);
+				while (total_written < len) {
+					w_size = write(fd, ret + total_written, len - total_written);
+					if (w_size < 0) {
+						if (errno == EINTR || errno == EAGAIN)
+							continue;
+						perror("write error");
+						break;
+					}
+					total_written += w_size;
+				}
 			}
 		}
 	}
@@ -581,6 +561,12 @@ static void dispatchsocketevent(void) {
 	close(fd);
 }
 
+/*
+ * drawbar() - Renders the status bar providing user feedback and desktop information.
+ * This function is critical because it centralizes the rendering of dynamic UI elements,
+ * including the active client title and status text. Its design minimizes redraw latency,
+ * ensuring a seamless visual experience as WM state changes.
+ */
 void
 drawbar()
 {
@@ -608,36 +594,53 @@ drawbar()
 	drw_map(drw, mon.barwin, 0, 0, mon.ww, bh);
 }
 
-/* part of focus-follows-mouse (FFM) feature*/
+/*
+ * enternotify() - Triggers focus updates on pointer entry events.
+ * This function is critical for implementing focus-follows-mouse behavior.
+ */
 void
 enternotify(XEvent *e)
 {
 	Client *c;
 	XCrossingEvent *ev = &e->xcrossing;
-
+ 
 	if ((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != root)
 		return;
 	c = wintoclient(ev->window);
-	if (!c || c == mon.clients)
+	if (!c)
 		return;
+	fprintf(stderr, "Focus-follows-mouse: losing %s, gaining %s\n", 
+			mon.clients ? mon.clients->name : "none", c->name);
 	focus(c);
 }
 
+/*
+ * expose() - Efficiently handles window expose events to refresh visual content.
+ * This function is part of the critical redraw path; it ensures that the bar and other
+ * window elements are re-rendered promptly when unmapped regions become visible.
+ */
 void
 expose(XEvent *e)
 {
 	XExposeEvent *ev = &e->xexpose;
-
+	
 	if (ev->count == 0 )
 		drawbar();
 }
 
+/*
+ * focus() - Central handler for shifting input focus among client windows.
+ * This function not only updates visual indicators (e.g., window borders) but also
+ * reorders the client list to maintain WM invariants. The design choice to centralize
+ * focus management here ensures that all focus transitions (whether triggered by mouse or
+ * programmatically) consistently propagate through the system, simplifying state tracking
+ * and event routing. This is key to supporting focus-follows-mouse and ensuring a smooth UX.
+ */
 void
 focus(Client *c)
 {
-	if (!c)
-		c = mon.clients; /* TODO: confirm this logic change */
-	if (mon.clients && mon.clients != c) {
+	c = c ? c : mon.clients; /* default to first client if c is NULL */
+	if (mon.clients != c) {
 		unfocus(mon.clients, 0);
 		detach(c);
 		attach(c);
@@ -648,6 +651,7 @@ focus(Client *c)
 		grabbuttons(c, 1);
 		XSetWindowBorder(dpy, c->win, scheme[SchemeSel][ColBorder].pixel);
 		setfocus(c);
+		updatetitle(c);
 	} else {
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 		XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
@@ -725,6 +729,11 @@ getstate(Window w)
 	return result;
 }
 
+/*
+ * gettextprop() - Retrieves a text property from a window.
+ * This function dynamically fetching properties such as window names
+ * and status indicators that drive the WM's interface updates. 
+ */
 int
 gettextprop(Window w, Atom atom, char *text, unsigned int size)
 {
@@ -748,6 +757,11 @@ gettextprop(Window w, Atom atom, char *text, unsigned int size)
 	return 1;
 }
 
+/*
+ * grabbuttons() - Sets up mouse button event grabs for the client window.
+ * This function is critical in ensuring that all mouse interactions on a client
+ * window are correctly intercepted and handled according to the WM's policy.
+ */
 void
 grabbuttons(Client *c, int focused)
 {
@@ -769,6 +783,11 @@ grabbuttons(Client *c, int focused)
 	}
 }
 
+/*
+ * grabkeys() - Centralizes key grabbing during initialization.
+ * This function is critical because it ensures that the WM intercepts all keyboard
+ * inputs with the proper modifier combinations (handling variations like NumLock and LockMask).
+ */
 void
 grabkeys(void)
 {
@@ -797,6 +816,10 @@ grabkeys(void)
 	}
 }
 
+/*
+ * keypress() - Dispatches key events to their bound actions.
+ * Maps user key inputs to functions.
+ */
 void
 keypress(XEvent *e)
 {
@@ -839,57 +862,57 @@ logXErrors(Display *dpy, XErrorEvent *e) {
     return 0; 
 }
 
+/*
+ * manage() - Integrates a new client window into the window manager.
+ * This function is critical because it centralizes client initialization,
+ * and setting state for proper integration into the WM's layout
+ * and event management. 
+ */
 void
 manage(Window w, XWindowAttributes *wa)
 {
-	Client *c, *t = NULL;
-	Window trans = None;
-	XWindowChanges wc;
+	Client *c = NULL;
 
+	/* allocate and initialize client */
 	c = ecalloc(1, sizeof(Client));
 	c->win = w;
-	/* geometry */
 	c->x = c->oldx = wa->x;
 	c->y = c->oldy = wa->y;
 	c->w = c->oldw = wa->width;
 	c->h = c->oldh = wa->height;
-	c->oldbw = wa->border_width;
+	c->bw = c->oldbw = borderpx;
 
+	/* update client state and properties */
 	updatetitle(c);
-	if (!(XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))))
-		applyrules(c);
-
-	if (c->x + WIDTH(c) > mon.wx + mon.ww)
-		c->x = mon.wx + mon.ww - WIDTH(c);
-	if (c->y + HEIGHT(c) > mon.wy + mon.wh)
-		c->y = mon.wy + mon.wh - HEIGHT(c);
-	c->x = MAX(c->x, mon.wx);
-	c->y = MAX(c->y, mon.wy);
-	c->bw = borderpx;
-
-	wc.border_width = c->bw;
-	XConfigureWindow(dpy, w, CWBorderWidth, &wc);
 	XSetWindowBorder(dpy, w, scheme[SchemeNorm][ColBorder].pixel);
-	configure(c); /* propagates border_width, if size doesn't change */
 	updatewindowtype(c);
-	updatesizehints(c);
 	updatewmhints(c);
+
+	/* setup input and event handling */
 	XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	grabbuttons(c, 0);
-	if (!c->isfloating)
-		c->isfloating = c->isfixed;
-	if (c->isfloating)
-		XRaiseWindow(dpy, c->win);
-	attach(c);
+	c->isfloating = c->isfixed;
+
+	/* EWMH and X11 integration */
 	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
 		(unsigned char *) &(c->win), 1);
-	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
+
 	setclientstate(c, NormalState);
-	focus(NULL);
+
+	/* attach, arrange, resize, notify, render, and focus */
+	attach(c);
 	arrange();
+	resize(c, c->x, c->y, c->w, c->h);
+	configure(c); 
 	XMapWindow(dpy, c->win);
+	focus(NULL);
 }
 
+/*
+ * mappingnotify() - Refreshes keyboard mapping and re-establishes key bindings.
+ * This function is critical in maintaining reliable keyboard input after a 
+ * keyboard mapping update (for example, due to hardware changes or locale adjustments).
+ */
 void
 mappingnotify(XEvent *e)
 {
@@ -900,6 +923,12 @@ mappingnotify(XEvent *e)
 		grabkeys();
 }
 
+/*
+ * maprequest() - Handles mapping requests for new windows.
+ * This function is critical as it immediately integrates new windows
+ * into the window manager by checking for override redirects and delegating
+ * client management when necessary. 
+ */
 void
 maprequest(XEvent *e)
 {
@@ -921,12 +950,17 @@ movemouse(const Arg *arg)
 
 	if (!(c = mon.clients))
 		return;
+	if (!c->isfloating)
+		return;
 	arrange();
 	if (XGrabPointer(dpy, root, False, MOUSEMASK, GrabModeAsync, GrabModeAsync,
 		None, cursor[CurMove]->cursor, CurrentTime) != GrabSuccess)
 		return;
 	if (!getrootptr(&x, &y))
 		return;
+	int ix = x, iy = y;
+	int ox = c->x, oy = c->y;
+	unsigned long lastMotionTime = 0;
 	do {
 		XMaskEvent(dpy, MOUSEMASK|ExposureMask|SubstructureRedirectMask, &ev);
 		switch(ev.type) {
@@ -935,18 +969,37 @@ movemouse(const Arg *arg)
 		case MapRequest:
 			xhandler[ev.type](&ev);
 			break;
+		case MotionNotify:
+		{
+			XMotionEvent *me = &ev.xmotion;
+			if ((me->time - lastMotionTime) < 17)
+				continue;
+			lastMotionTime = me->time;
+			int nx = ox + (me->x_root - ix);
+			int ny = oy + (me->y_root - iy);
+			if (abs(nx - mon.wx) < snap)
+				nx = mon.wx;
+			if (abs((nx + WIDTH(c)) - (mon.wx + mon.ww)) < snap)
+				nx = mon.wx + mon.ww - WIDTH(c);
+			if (abs(ny - mon.wy) < snap)
+				ny = mon.wy;
+			if (abs((ny + HEIGHT(c)) - (mon.wy + mon.wh)) < snap)
+				ny = mon.wy + mon.wh - HEIGHT(c);
+			resize(c, nx, ny, c->w, c->h);
+		}
+		break;
 		}
 	} while (ev.type != ButtonRelease);
 	XUngrabPointer(dpy, CurrentTime);
 }
 
-Client *
-nexttiled(Client *c)
-{
-	for (; c && c->isfloating ; c = c->next);
-	return c;
-}
-
+/*
+ * propertynotify() - Integrates property change events into WM state updates.
+ * This function is critical as it processes dynamic updates from the X server,
+ * including title changes, WM hints, and window type transitions. By centralizing
+ * these property notifications, the WM ensures that client state remains consistently
+ * synchronized with their visual representation, which is vital for responsive window management.
+ */
 void
 propertynotify(XEvent *e)
 {
@@ -984,42 +1037,79 @@ propertynotify(XEvent *e)
 	}
 }
 
-void
-quit(const Arg *arg)
+char*
+quit(char* unused)
 {
 	running = 0;
+	return NULL;
 }
 
+/*
+ * resize() - Centralizes the handling of client window resizing.
+ * It applies size hints and then directly updates the client's geometry.
+ */
 void
-resize(Client *c, int x, int y, int w, int h, int interact)
+resize(Client *c, int x, int y, int w, int h)
 {
-	if (applysizehints(c, &x, &y, &w, &h, interact))
-		resizeclient(c, x, y, w, h);
+	if (c->isfixed)
+		return;
+	
+	/* Interactive resizing: adjust position if window would be off-screen */
+	if (c->isfloating) {
+		if (x > sw) /* off right? */
+			x = sw - WIDTH(c); 
+		if (y > sh) /* off bottom? */
+			y = sh - HEIGHT(c);
+		if (x + w + 2 * c->bw < 0) /* off left? */
+			x = 0;
+		if (y + h + 2 * c->bw < 0) /* off top? */
+			y = 0;
+		/* Set minimum dimensions: must be greater than bar height */
+		if (h < bh)
+			h = bh;
+		if (w < bh)
+			w = bh;
+	} else {
+		x = mon.wx;
+		y = mon.wy;
+		w = mon.ww;
+		h = mon.wh;
+	}
+	
+	/* If any geometry has changed, update the client window configuration */
+	if (x != c->x || y != c->y || w != c->w || h != c->h) {
+		XWindowChanges wc;
+		c->oldx = c->x; c->x = wc.x = x;
+		c->oldy = c->y; c->y = wc.y = y;
+		c->oldw = c->w; c->w = wc.width = w;
+		c->oldh = c->h; c->h = wc.height = h;
+		wc.border_width = c->bw;
+		XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
+		configure(c);
+		XSync(dpy, False);
+	}
 }
 
-void
-resizeclient(Client *c, int x, int y, int w, int h)
-{
-	XWindowChanges wc;
-
-	c->oldx = c->x; c->x = wc.x = x;
-	c->oldy = c->y; c->y = wc.y = y;
-	c->oldw = c->w; c->w = wc.width = w;
-	c->oldh = c->h; c->h = wc.height = h;
-	wc.border_width = c->bw;
-	XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
-	configure(c);
-	XSync(dpy, False);
-}
-
+/*
+ * resizemouse() - Provides interactive window resizing using mouse events.
+ * This function enters a dedicated event loop to capture all resize-related mouse
+ * events, ensuring that the window manager can update window dimensions in real time.
+ */
 void
 resizemouse(const Arg *arg)
 {
 	Client *c;
 	XEvent ev;
-
+	int ocx, ocy;
+	unsigned long lastMotionTime = 0;
+		
 	if (!(c = mon.clients))
 		return;
+	if (!c->isfloating)
+		return;
+	if (!getrootptr(&ocx, &ocy))
+		return;
+	int origw = c->w, origh = c->h;
 	
 	arrange();
 	if (XGrabPointer(dpy, root, False, MOUSEMASK, GrabModeAsync, GrabModeAsync,
@@ -1034,6 +1124,21 @@ resizemouse(const Arg *arg)
 		case MapRequest:
 			xhandler[ev.type](&ev);
 			break;
+		case MotionNotify:
+		{
+			XMotionEvent *me = &ev.xmotion;
+			if ((me->time - lastMotionTime) < 17)
+				continue;
+			lastMotionTime = me->time;
+			int nw = MAX(origw + (me->x_root - ocx), 1);
+			int nh = MAX(origh + (me->y_root - ocy), 1);
+			if (c->x + nw > mon.wx + mon.ww)
+				nw = mon.wx + mon.ww - c->x;
+			if (c->y + nh > mon.wy + mon.wh)
+				nh = mon.wy + mon.wh - c->y;
+			resize(c, c->x, c->y, nw, nh);
+		}
+		break;
 		}
 	} while (ev.type != ButtonRelease);
 	XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w + c->bw - 1, c->h + c->bw - 1);
@@ -1041,6 +1146,28 @@ resizemouse(const Arg *arg)
 	while (XCheckMaskEvent(dpy, EnterWindowMask, &ev));
 }
 
+void
+restack(void)
+{
+	Client *c;
+	XWindowChanges wc;
+
+	wc.stack_mode = Below;
+	wc.sibling = mon.barwin;
+	/* Iterate over sorted client list, configuring windows in order */
+	for (c = mon.clients; c; c = c->next) {
+		XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+		wc.sibling = c->win;
+	}
+	XSync(dpy, False);
+}
+
+/*
+ * run() - Main event loop integrating X events and socket events.
+ * This function polls both the X connection and a local socket so that
+ * it can handle user interactions (like window events) as well as interprocess
+ * commands. Single poll-based loop helps keep things fast.
+ */
 void run(void) {
 	XEvent ev;
 	int xfd, timeout;
@@ -1049,7 +1176,7 @@ void run(void) {
 	xfd = ConnectionNumber(dpy);
 	timeout = 100; // Poll timeout in milliseconds
 
-   /* Initialize pollfd structure */
+   	/* Initialize pollfd structure */
 	fds[0].fd = xfd;
 	fds[0].events = POLLIN; // Check for data to read from X server
 	fds[1].fd = sockfd;
@@ -1076,6 +1203,9 @@ void run(void) {
 	}
 }
 
+/*
+ * scan() - Integrates pre-existing client windows into the window manager.
+ */
 void
 scan(void)
 {
@@ -1131,6 +1261,12 @@ setclientstate(Client *c, long state)
 		PropModeReplace, (unsigned char *)data, 2);
 }
 
+/*
+ * sendevent() - Dispatches a client message event if the specified protocol is supported.
+ * This function is critical for allowing the WM to communicate with client windows
+ * by sending protocol events (e.g., WM_DELETE_WINDOW) that inform them about state changes.
+ * Centralizing event dispatch here ensures consistent inter-client communication as per ICCCM.
+ */
 int
 sendevent(Client *c, Atom proto)
 {
@@ -1156,6 +1292,12 @@ sendevent(Client *c, Atom proto)
 	return exists;
 }
 
+/*
+ * setfocus() - Directs the input focus to a client window while ensuring WM state synchronization.
+ * It is critical for maintaining consistent interactive state in the WM event loop.
+ * The WM sends a WM_TAKE_FOCUS event after setting focus, allowing applications to adjust behavior
+ * based on the active window context.
+ */
 void
 setfocus(Client *c)
 {
@@ -1168,6 +1310,14 @@ setfocus(Client *c)
 	sendevent(c, wmatom[WMTakeFocus]);
 }
 
+/*
+ * setup() - Initializes the window manager's core state and resources.
+ * This function is critical because it establishes the necessary X connections,
+ * configures signal handling, and loads essential resources (such as fonts and colors)
+ * that define the WM's overall behavior. This centralized initialization ensures that
+ * all subsequent components operate within a consistent environment, simplifying
+ * system-wide event handling and resource management.
+ */
 void
 setup(void)
 {
@@ -1249,6 +1399,12 @@ setup(void)
 	setupsocket();
 }
 
+/*
+ * setupsocket() - Initializes the IPC socket interface.
+ * This function is critical because it establishes a non-blocking Unix domain socket for inter-process communication.
+ * By enabling external processes to send commands without blocking the main event loop,
+ * it enhances the window manager's responsiveness and supports extensibility.
+ */
 void
 setupsocket(void) {
 	struct sockaddr_un addr;
@@ -1279,6 +1435,8 @@ setupsocket(void) {
 	/* Listen for incoming connections */
 	if (listen(sockfd, SOMAXCONN) < 0) 
 		die("listen failed");
+	if (chmod(SOCKET_PATH, 0666) < 0)
+		die("chmod failed");
 }
 
 void
@@ -1294,6 +1452,10 @@ seturgent(Client *c, int urg)
 	XFree(wmh);
 }
 
+/*
+ * spawn() - Forks a process to execute a command.
+ * Decouples execution from the event loop to ensure responsiveness.
+ */
 void
 spawn(const Arg *arg)
 {
@@ -1314,27 +1476,67 @@ spawn(const Arg *arg)
 	}
 }
 
+static char* statedump(char *unused) {
+    static char dump[8192];
+    int len = 0;
+    len += snprintf(dump + len, sizeof(dump) - len,
+                    "{\n\"bar_visible\": %s,\n\"screen\": { \"w\": %d, \"h\": %d },\n",
+                    (mon.showbar ? "true" : "false"), sw, sh);
+    if (mon.clients)
+        len += snprintf(dump + len, sizeof(dump) - len,
+                        "\"active_client\": \"%s\",\n", mon.clients->name);
+    else
+        len += snprintf(dump + len, sizeof(dump) - len,
+                        "\"active_client\": null,\n");
+    len += snprintf(dump + len, sizeof(dump) - len, "\"clients\": [\n");
+    int i = 0;
+    for (Client *c = mon.clients; c; c = c->next, i++) {
+         len += snprintf(dump + len, sizeof(dump) - len,
+                         "  { \"id\": %d, \"name\": \"%s\", \"geometry\": { \"x\": %d, \"y\": %d, \"w\": %d, \"h\": %d }, \"state\": \"%s\", \"isfixed\": %d }%s\n",
+                         i, c->name, c->x, c->y, c->w, c->h,
+                         (c->isfloating ? "Floating" : "Tiled"),
+                         c->isfixed,
+                         (c->next ? "," : ""));
+    }
+    len += snprintf(dump + len, sizeof(dump) - len, "]\n}\n");
+    return dump;
+}
+
 void
 togglebar(const Arg *arg)
 {
 	mon.showbar = !mon.showbar;
 	updatebarpos();
 	XMoveResizeWindow(dpy, mon.barwin, mon.wx, mon.by, mon.ww, bh);
+	for (Client *c = mon.clients; c; c = c->next) {
+		if (!c->isfloating)
+			resize(c, mon.wx, mon.wy, mon.ww, mon.wh);
+	}
 	arrange();
 }
 
 void
 togglefloating(const Arg *arg)
 {
-	if (!mon.clients)
+
+	Client *c;
+	Window focusedwin;
+	int revert;
+
+	XGetInputFocus(dpy, &focusedwin, &revert);
+	if (!(c = wintoclient(focusedwin)) || c->isfixed)
 		return;
-	mon.clients->isfloating = !mon.clients->isfloating || mon.clients->isfixed;
-	if (mon.clients->isfloating)
-		resize(mon.clients, mon.clients->x, mon.clients->y,
-			mon.clients->w, mon.clients->h, 0);
+	c->isfloating = !c->isfloating;
+	if (c->isfloating)
+		resize(c, c->oldx, c->oldy, c->oldw, c->oldh);
+	else
+		resize(c, mon.wx, mon.wy, mon.ww, mon.wh);
 	arrange();
 }
 
+/*
+ * unfocus() - Handles the removal of focus styling from a client window.
+ */
 void
 unfocus(Client *c, int setfocus)
 {
@@ -1348,6 +1550,11 @@ unfocus(Client *c, int setfocus)
 	}
 }
 
+/*
+ * unmanage() - Removes a client from the window management stack.
+ * This function is critical because it consolidates all cleanup and removal operations
+ * when a client window is unmapped or destroyed. 
+ */
 void
 unmanage(Client *c, int destroyed)
 {
@@ -1372,6 +1579,13 @@ unmanage(Client *c, int destroyed)
 	updateclientlist();
 }
 
+/*
+ * unmapnotify() - Reacts to window unmapping events to maintain WM state consistency.
+ * This function is critical because it distinguishes between client-generated unmap events
+ * and those initiated by the X server when focus shifts occur. By updating the client state
+ * appropriately (either marking it as withdrawn or fully unmanaging it), the WM prevents orphaned
+ * window references and maintains a coherent internal state.
+ */
 void
 unmapnotify(XEvent *e)
 {
@@ -1386,6 +1600,12 @@ unmapnotify(XEvent *e)
 	}
 }
 
+/*
+ * updatebarpos() - Calculates and updates the bar's position and available window area.
+ * This function is critical for adjusting the layout when the bar is visible or hidden.
+ * By centralizing the calculation of workspace dimensions based on bar visibility,
+ * it ensures that layout changes propagate consistently throughout the window manager.
+ */
 void
 updatebarpos()
 {
@@ -1399,6 +1619,11 @@ updatebarpos()
 		mon.by = -bh;
 }
 
+/*
+ * updateclientlist() - Synchronizes the WM's client list with the EWMH _NET_CLIENT_LIST property.
+ * This function is critical because it ensures that external desktop components and
+ * standards-compliant tools accurately reflect the current set of managed windows.
+ */
 void
 updateclientlist()
 {
@@ -1411,6 +1636,9 @@ updateclientlist()
 			(unsigned char *) &(c->win), 1);
 }
 
+/*
+ * updategeom() - Updates monitor geometry in response to screen size changes.
+ */
 int
 updategeom(void)
 {
@@ -1440,49 +1668,6 @@ updatenumlockmask(void)
 	XFreeModifiermap(modmap);
 }
 
-void
-updatesizehints(Client *c)
-{
-	long msize;
-	XSizeHints size;
-
-	if (!XGetWMNormalHints(dpy, c->win, &size, &msize))
-		/* size is uninitialized, ensure that size.flags aren't used */
-		size.flags = PSize;
-	if (size.flags & PBaseSize) {
-		c->basew = size.base_width;
-		c->baseh = size.base_height;
-	} else if (size.flags & PMinSize) {
-		c->basew = size.min_width;
-		c->baseh = size.min_height;
-	} else
-		c->basew = c->baseh = 0;
-	if (size.flags & PResizeInc) {
-		c->incw = size.width_inc;
-		c->inch = size.height_inc;
-	} else
-		c->incw = c->inch = 0;
-	if (size.flags & PMaxSize) {
-		c->maxw = size.max_width;
-		c->maxh = size.max_height;
-	} else
-		c->maxw = c->maxh = 0;
-	if (size.flags & PMinSize) {
-		c->minw = size.min_width;
-		c->minh = size.min_height;
-	} else if (size.flags & PBaseSize) {
-		c->minw = size.base_width;
-		c->minh = size.base_height;
-	} else
-		c->minw = c->minh = 0;
-	if (size.flags & PAspect) {
-		c->mina = (float)size.min_aspect.y / size.min_aspect.x;
-		c->maxa = (float)size.max_aspect.x / size.max_aspect.y;
-	} else
-		c->maxa = c->mina = 0.0;
-	c->isfixed = (c->maxw && c->maxh && c->maxw == c->minw && c->maxh == c->minh);
-	c->hintsvalid = 1;
-}
 
 void
 updatestatus(void)

@@ -6,3 +6,6 @@ echo "HOST_IP=$HOST_IP" > ~/.xwm_env
 
 cd /home/vagrant/xwm
 make clean install
+
+# Restart X to re-trigger .xinitrc (and gdbserver)
+pkill X

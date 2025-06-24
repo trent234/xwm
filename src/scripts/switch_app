@@ -1,18 +1,16 @@
 #!/bin/sh
+# Overview: This script sends commands to the WM's socket to switch the active client.
 
-socket_path="/tmp/xwm"
-# enumerated endpoints in dwm.c
-getclients=0  
-selectclient=1  
+SOCKET_PATH="/tmp/xwm"
+# Enumerated WM socket command codes as defined in wm.c:
+GETCLIENTS=0
+SELECTCLIENT=1
 
-# retrieve clients list from wm and pipe it to menu
-clients=$(echo "$getclients" | nc -U "$socket_path")
-selected_client=$(echo "$clients" | menu)
+# Retrieve client list and let the user select a client.
+selected_client=$(printf "%s\n" "$GETCLIENTS" | nc -U "$SOCKET_PATH" | menu -p 'Switch App: ')
 
-# extract the position from the selected client string
-# assuming the client string format "pos client_name"
-selected_pos=$(echo "$selected_client" | cut -d ' ' -f1) || exit 1
+# Extract the client ID from the selected entry.
+selected_pos=$(printf "%s\n" "$selected_client" | cut -d ' ' -f1) || exit 1
 
-# construct msg to set focus on the selected client and send it to wm
-message="$selectclient\n$selected_pos"
-echo "$message" | nc -U "$socket_path"
+# Send the select client command along with the selected ID.
+printf "%s\n%s\n" "$SELECTCLIENT" "$selected_pos" | nc -U "$SOCKET_PATH"

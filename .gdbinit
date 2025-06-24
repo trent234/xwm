@@ -1,8 +1,8 @@
 # Display source context
 set pagination off
 set print pretty on
-set print elements 0        # Show all elements of arrays
-set print null-stop on      # Stop strings at NULL
+set print elements 0
+set print null-stop on
 
 # Enable line numbers in backtraces
 set backtrace limit 50
@@ -27,4 +27,4 @@ dir /home/user/code/xwm
 # 2. Immediately start the program (run)
 # 3. Pause at the first line of user code
 break main
-run
+continue
