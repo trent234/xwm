@@ -2,6 +2,7 @@
 VERSION = 0.1
 
 # paths
+PREFIX = ${HOME}/.local
 COMMON = ../common
 WM = src/wm
 MENU = src/menu

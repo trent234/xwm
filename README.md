@@ -1,9 +1,20 @@
 
 # xwm - eXperimental window manager
 
-xwm is an experiment that started as a fork of dwm and dmenu. I've been interested in hacking on a wm and instead of starting from scratch thought it'd be more fun to start with a fork of the wm that I've been using for years and have come to appreciate. Kind of like learning how a car works by slowly taking it apart, I'm using dwm to learn about xlib.
+## Overview
 
-One potential goal is to boil this wm into an even simpler version that will be useful on touch devices like the reMarkable 1 and/or the PinePhone. The idea is to use dwm as the start point for the xlib wm components and dmenu for the app launcher which instead of being typing centric will list out gui apps and be scrollable and clickable. Also will be able to list open processes in that launcher as well as programs, and modifying the classic layout to instead have one main client, and all others are hidden. One exception will need to be the onscreen keyboard which will involve learning from the team behind the sxmo-dwm project and use a dock patch where svkb declares itself as a special type of client that gets handled by dwm specially.
+**xwm** is a minimalist X11 window manager focused on single-application visibility with a built-in launcher and switcher for streamlined user interaction.
+
+Inspired by `dwm` and `dmenu`, **xwm** is designed to run efficiently on constrained or touch-based environments such as the reMarkable 1 and the PinePhone.
+
+### Key Features
+
+- **Single Visible Client**: Only one window is shown at a time; all others are hidden.
+- **Integrated App Launcher**: A scrollable and clickable launcher (built on `dmenu`) replaces traditional typing-based app search.
+- **Process and Application View**: The launcher can display both installed applications and currently running processes.
+- **Touch Device Support**: Designed to work with on-screen keyboards and limited input; will support special client handling (e.g., `svkbd`) using concepts from the [sxmo project](https://sxmo.org) and `dwm`'s dock patch.
+
+This project extends the simplicity of `dwm` and `dmenu` to deliver a clean, distraction-free windowing model with touch compatibility.
 
 ## Current Project Status & Notes
 The next todo is to make the menu clickable, then add the keyboard, then gesture support.  
@@ -29,17 +40,6 @@ I'm removing features partly as an exercise, but it has the benefit of reducing 
 dwm 2165 / wm 1582 SLOC  
 dmenu 796 / menu 665 SLOC 
 
-### Screenshots
-#### App Launcher
-![launch_app](https://github.com/trent234/xwm/assets/22989914/1d087cd8-7fc9-4022-b0a4-4ed7c619f864)
-
-#### App Switcher
-![switch_app](https://github.com/trent234/xwm/assets/22989914/6aafe1ca-10f2-479e-a632-96db882db6ca)
-
-#### App Selected
-![app](https://github.com/trent234/xwm/assets/22989914/24fb2318-3a57-4ae2-8b0c-d4f7dbfc6cb0)
-
-
 #### wm
 
  This is a dynamic window manager is designed like any other X client as well. It is
@@ -59,7 +59,10 @@ dmenu 796 / menu 665 SLOC
 
 ## Requirements
 
-In order to build you need the Xlib header files.
+In order to build you need the Xlib header files e.g-  
+```
+sudo apt install libx11-dev
+```
 
 ## Installation
 
@@ -79,74 +82,24 @@ Add the following line to your `.xinitrc` to start the window manager using `sta
 exec wm
 ```
 
-In order to display status info in the bar, you can do something like this in your `.xinitrc`:
+## Usage
 
-```shell
-while xsetroot -name "`date` `uptime | sed 's/.*,//'`"
-do
-	sleep 1
-done &
-exec wm
-```
+These shortcuts are modifiable in wm.h but below outlines the defaults.  
+The window manager uses `Alt` (`Mod1`) as the primary modifier key:
 
+- `` Alt + f `` — Launch application launcher (`launch_app`)
+- `` Alt + j `` — Switch to a different application (`switch_app`)
+- `` Alt + Enter `` — Launch terminal (`uxterm`)
+- `` Alt + b `` — Toggle the visibility of the status bar
+- `` Alt + Shift + c `` — Close the focused window
+- `` Alt + Shift + q `` — Quit the window manager
 
-## Developing & debugging
+### Screenshots
+#### App Launcher
+![launch_app](https://github.com/trent234/xwm/assets/22989914/1d087cd8-7fc9-4022-b0a4-4ed7c619f864)
 
-I use virtualbox with a virtual NAT as the integral component of the build-run cycle. Create a debian 12 VM and note its IP. 
-From the host, within the repo parent run-  
-```
-scp -r xwm user@192.168.122.35:/tmp
-```
-Then I can SSH to the VM like so-  
-```
-ssh user@192.168.122.35  
-```
-For a new VM certain packages will be required- 
-* To pull
-  * git
-* Project dependencies
-  * libx11-dev
-  * libxft-dev
-* To build
-  * make
-  * gcc
-* To run
-  * xorg
-* To debug
-  * gdb
-  * gdbserver
-  * valgrind
-* To populate many apps to test with
-  * gnome
-* Missing deps for some gnome apps
-  * dbus-launch  
+#### App Switcher
+![switch_app](https://github.com/trent234/xwm/assets/22989914/6aafe1ca-10f2-479e-a632-96db882db6ca)
 
-SSH'd into the VM, move the source that was copied over to the same dir path as on the host (required for gdb)- 
-```
-mv /tmp/xwm /path/to/host/repo/dir
-```
-Create an ~/.xinitrc with these contents-
-```
-vi ~/.xinitrc
-exec gdbserver 192.168.122.35:5555 wm > /var/log/wm 2>&1
-```
-And in a separate terminal SSH'd in to the VM run- 
-```
-touch /var/log/wm
-tail -f /var/log/wm
-```
-Then, in a separate terminal SSH'd into the VM, start the wm with-
-```
-startx
-```
-Then on the host, from the repo root dir-
-```
-gdb -tui
-target remote 192.168.122.35:5555
-continue
-```
-At this point you'll have three essential windows-
-* A VM running the wm
-* A terminal tailing the logs for the wm and its child processes
-* A terminal with gdb remotely attached to wm
-And that's all you need to debug. Be sure the host repo root has the same version of build output as on remote. That is needed for gdb.  
+#### App Selected
+![app](https://github.com/trent234/xwm/assets/22989914/24fb2318-3a57-4ae2-8b0c-d4f7dbfc6cb0)
