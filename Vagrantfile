@@ -15,7 +15,7 @@ Vagrant.configure("2") do |config|
   apt-get install -y \
     git make gcc gdb gdbserver valgrind \
     xorg libx11-dev libxft-dev dbus-x11 \
-    systemd
+    systemd netcat-openbsd gedit
 
   echo "Linking guest path to match host path for GDB..."
   mkdir -p $(dirname #{host_src})
@@ -74,14 +74,5 @@ chmod +x ~/.xinitrc'
 
   config.vm.post_up_message = <<-MESSAGE
   Development environment ready for xwm.
-
-  To get started:
-    - SSH into the VM:        vagrant ssh
-    - Sync source manually:   vagrant rsync
-    - Start debugging:        make debug
-    - Tail runtime logs:      make tail-log
-
-  NOTE: Code is synced to /home/vagrant/xwm via rsync (not live).
-        Changes on host require 'vagrant rsync' to apply.
   MESSAGE
 end

@@ -56,6 +56,7 @@ static void setup(void);
 
 /* variables */
 static char text[BUFSIZ] = "";
+static char *prompt = NULL;
 static int bh, mw, mh;
 static unsigned int lines;
 static int lrpad; /* sum of left and right padding */
@@ -160,10 +161,15 @@ drawmenu(void)
 	/* Clear the entire window */
 	drw_rect(drw, 0, 0, mw, mh, 1, 1);
 
-	/* draw input field */
-	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
+	/* draw input field with prompt */
+    int promptw = 0;
+    if (prompt)
+        promptw = drw_fontset_getwidth(drw, prompt);
+    if (prompt)
+        drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
+    drw_text(drw, x + promptw, 0, w - promptw, bh, lrpad / 2, text, 0);
 
-	curpos = TEXTW(text) - TEXTW(&text[cursor]);
+	curpos = TEXTW(text) - TEXTW(&text[cursor]) + promptw;
 	if ((curpos += lrpad / 2 - 1) < w) {
 		drw_rect(drw, x + curpos, 2, 2, bh - 4, 1, 0);
 	}
@@ -677,6 +683,12 @@ int
 main(int argc, char *argv[])
 {
 	XWindowAttributes wa;
+    int i;
+    for (i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-p") && i + 1 < argc) {
+            prompt = argv[++i];
+        }
+    }
 
 	if (!setlocale(LC_CTYPE, "") || !XSupportsLocale())
 		fputs("warning: no locale support\n", stderr);

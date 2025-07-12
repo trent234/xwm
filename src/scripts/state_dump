@@ -1,0 +1,16 @@
+#!/bin/sh
+# This script uses the "StateDump" socket command (command code 2) to request a
+# structured WM state dump and prints the result to stdout as well as appending it to /var/log/wm.
+
+SOCKET_PATH="/tmp/xwm"
+COMMAND=2
+LOGFILE="/var/log/wm"
+
+# Send the command via a Unix domain socket and capture the response.
+response=$(printf "%s\n" "${COMMAND}" | nc -U "${SOCKET_PATH}")
+
+# Output the response to stdout.
+echo "$response"
+
+# Append the response to the log file.
+echo "$response" >> "$LOGFILE"

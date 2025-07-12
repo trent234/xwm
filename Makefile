@@ -12,7 +12,7 @@ SRC        = $(WM_SRC) $(MENU_SRC)
 OBJ        = ${SRC:.c=.o}
 
 # === Build Targets ===
-
+BIN_DIR = bin
 all: wm menu
 
 %.o: %.c
@@ -21,28 +21,24 @@ all: wm menu
 $(OBJ): config.mk
 
 wm: $(WM_SRC:.c=.o)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $(BIN_DIR)/wm $^ $(LDFLAGS)
 
 menu: $(MENU_SRC:.c=.o)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) -o $(BIN_DIR)/menu $^ $(LDFLAGS)
 
 clean:
-	rm -f $(OBJ) wm menu
+	rm -f $(OBJ) $(BIN_DIR)/wm $(BIN_DIR)/menu
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin
-	cp -f wm menu ${DESTDIR}${PREFIX}/bin
-	chmod 755 ${DESTDIR}${PREFIX}/bin/wm
-	chmod 755 ${DESTDIR}${PREFIX}/bin/menu
-	cp -f src/scripts/launch_app src/scripts/switch_app ${DESTDIR}${PREFIX}/bin
-	chmod 755 ${DESTDIR}${PREFIX}/bin/launch_app
-	chmod 755 ${DESTDIR}${PREFIX}/bin/switch_app
+	cp -f $(BIN_DIR)/* src/scripts/* ${DESTDIR}${PREFIX}/bin
+	chmod 755 ${DESTDIR}${PREFIX}/bin/*
+
+INSTALL_BINS = $(notdir $(wildcard $(BIN_DIR)/*))
+INSTALL_SCRIPTS = $(notdir $(wildcard src/scripts/*))
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/wm \
-	      ${DESTDIR}${PREFIX}/bin/menu \
-	      ${DESTDIR}${PREFIX}/bin/launch_app \
-	      ${DESTDIR}${PREFIX}/bin/switch_app
+	rm -f $(addprefix ${DESTDIR}${PREFIX}/bin/, $(INSTALL_BINS) $(INSTALL_SCRIPTS))
 
 # === Remote Development & Debugging ===
 
@@ -52,14 +48,14 @@ REMOTE_USER := vagrant
 REMOTE_DIR := /home/$(REMOTE_USER)/xwm
 GDB_PORT := 5555
 
-# Sync code to VM and rebuild with correct HOST_IP context
+# Sync code to VM and rebuild, restart X and thus gdbserver (0)
 rebuild:
 	vagrant rsync
 	vagrant ssh -c 'bash /home/vagrant/xwm/scripts/rebuild.sh'
 
+# Tail log output from inside VM (2)  
 debug:
-	@echo "Connecting to gdbserver at $(REMOTE_IP):$(GDB_PORT)..."
-	@gdb -tui -ex "target remote $(REMOTE_IP):$(GDB_PORT)" -ex continue
+	gdb -ex "target remote $(REMOTE_IP):$(GDB_PORT)" 
 
 # Tail log output from inside VM (2)  
 tail-log:
@@ -69,7 +65,7 @@ tail-log:
 view:
 	remote-viewer vnc://127.0.0.1:5901 &
 
-# Composite target of 1, 2, and 3 above within tmux
+# Composite target of 0-3 above within tmux for one command dev setup
 start: rebuild view
 	@tmux new-session -d -s xwm_dev \
 		"make debug" \; \

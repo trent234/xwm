@@ -1,26 +1,11 @@
 #!/bin/sh
+# Overview: This script scans .desktop files under /usr/share/applications,
+# extracts the first Exec command from each file (excluding those marked as NoDisplay=true),
+# and presents a sorted, unique list via a menu for launching applications.
 
-search_dirs="/usr/share/applications"
-apps=""
-first_app=true
-
-for dir in $search_dirs; do
-    for desktop_file in $(find "$dir" -name '*.desktop'); do
-        # Skip .desktop files with NoDisplay=true
-        if grep -q '^NoDisplay=true' "$desktop_file"; then
-            continue
-        fi
-        # extract the exec command, remove arguments and field codes
-        exec_line=$(grep '^Exec=' "$desktop_file" | head -n 1 | sed 's/^Exec=//' | cut -d ' ' -f 1)
-        if [ -n "$exec_line" ]; then
-            if [ "$first_app" = true ]; then
-                apps="$exec_line"
-                first_app=false
-            else
-                apps="$apps\n$exec_line"
-            fi
-        fi
-    done
-done
-
-echo "$apps" | sort -u | menu | ${SHELL:-"/bin/sh"} &
+find /usr/share/applications -type f -name '*.desktop' | while read desktop_file; do
+    if grep -q '^NoDisplay=true' "$desktop_file"; then
+        continue
+    fi
+    sed -n '/^Exec=/ { s/^Exec=//; s/ .*$//; p; q }' "$desktop_file"
+done | sort -u | menu -p 'Launch App: ' | ${SHELL:-"/bin/sh"} &
