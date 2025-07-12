@@ -14,8 +14,8 @@ Vagrant.configure("2") do |config|
   apt-get update
   apt-get install -y \
     git make gcc gdb gdbserver valgrind \
-    xorg libx11-dev libxft-dev dbus-x11 \
-    systemd netcat-openbsd gedit
+    xorg libx11-dev libxft-dev libxtst-dev dbus-x11 \
+    systemd netcat-openbsd
 
   echo "Linking guest path to match host path for GDB..."
   mkdir -p $(dirname #{host_src})

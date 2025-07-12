@@ -1,0 +1,8 @@
+#!/bin/sh
+# toggle_kb: toggles the kb keyboard process.
+# Checks if the kb process is running and either launches or kills it accordingly.
+if pgrep -x "kb" > /dev/null; then
+    pkill kb
+else
+    kb -d &
+fi
