@@ -79,10 +79,13 @@ Moving and resizing windows is only valid on floating windows.
 
 ## Screenshots
 #### App Launcher
-![launch_app](https://github.com/trent234/xwm/assets/22989914/1d087cd8-7fc9-4022-b0a4-4ed7c619f864)
+![launch_app](https://github.com/user-attachments/assets/4b31b612-f2c9-45d1-ac1f-593541082104)
 
 #### App Switcher
-![switch_app](https://github.com/trent234/xwm/assets/22989914/6aafe1ca-10f2-479e-a632-96db882db6ca)
+![switch_app](https://github.com/user-attachments/assets/78c21374-0cd4-4579-abf4-ffe142058032)
 
 #### App Selected
-![app](https://github.com/trent234/xwm/assets/22989914/24fb2318-3a57-4ae2-8b0c-d4f7dbfc6cb0)
+![app](https://github.com/user-attachments/assets/f670eb39-35e0-4201-8c05-4d0a5b6c3236)
+
+#### Quit WM Confirmation
+![quit qm](https://github.com/user-attachments/assets/78875f92-0681-43d5-86f4-d5411969cd8d)
