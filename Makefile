@@ -8,12 +8,13 @@ include config.mk
 COMMON_SRC = src/common/drw.c src/common/util.c
 WM_SRC     = src/wm/wm.c $(COMMON_SRC)
 MENU_SRC   = src/menu/menu.c $(COMMON_SRC)
+KB_SRC     = $(KB)/kb.c $(COMMON_SRC)
 SRC        = $(WM_SRC) $(MENU_SRC)
 OBJ        = ${SRC:.c=.o}
 
 # === Build Targets ===
 BIN_DIR = bin
-all: wm menu
+all: wm menu kb
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) $< -o $@
@@ -26,8 +27,11 @@ wm: $(WM_SRC:.c=.o)
 menu: $(MENU_SRC:.c=.o)
 	$(CC) -o $(BIN_DIR)/menu $^ $(LDFLAGS)
 
+kb: $(KB_SRC:.c=.o)
+	$(CC) -o $(BIN_DIR)/kb $^ $(LDFLAGS)
+
 clean:
-	rm -f $(OBJ) $(BIN_DIR)/wm $(BIN_DIR)/menu
+	rm -f $(OBJ) $(BIN_DIR)/wm $(BIN_DIR)/menu $(BIN_DIR)/kb
 
 install: all
 	mkdir -p ${DESTDIR}${PREFIX}/bin

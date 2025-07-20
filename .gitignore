@@ -1,3 +1,4 @@
 .vscode/
 .vagrant/
 .aider*
+.gdb_history

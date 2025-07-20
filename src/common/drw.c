@@ -394,6 +394,11 @@ drw_map(Drw *drw, Window win, int x, int y, unsigned int w, unsigned int h)
 	XSync(drw->dpy, False);
 }
 
+void
+drw_sync(Drw *drw) {
+    XSync(drw->dpy, False);
+}
+
 unsigned int
 drw_fontset_getwidth(Drw *drw, const char *text)
 {

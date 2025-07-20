@@ -18,15 +18,17 @@ static const char *colors[][3] = {
 /* commands */
 static const char *launch_app[] = { "launch_app", NULL };
 static const char *switch_app[] = { "switch_app", NULL };
-static const char *quitcmd[]  = { "quit_wm", "-p", NULL };
+static const char *toggle_kb[] 	= { "toggle_kb", NULL };
+static const char *quit_cmd[]  	= { "quit_wm", "-p", NULL };
 
 static const Key keys[] = {
     /* modifier            key          function           argument */
     { Mod1Mask,            XK_f,        spawn,             { .v = launch_app } },
     { Mod1Mask,            XK_j,        spawn,             { .v = switch_app } },
-    { Mod1Mask,            XK_b,        togglebar,         { 0 } },
+    { Mod1Mask,            XK_k,        spawn,             { .v = toggle_kb } },
+    { Mod1Mask,            XK_d,        togglebar,         { 0 } },
     { Mod1Mask|ShiftMask,  XK_j,        killclient,        { 0 } },
-    { Mod1Mask|ShiftMask,  XK_f,        spawn,             { .v = quitcmd } },
+    { Mod1Mask|ShiftMask,  XK_f,        spawn,             { .v = quit_cmd } },
 };
 
 /* button definitions */

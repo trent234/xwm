@@ -9,36 +9,12 @@ Inspired by `dwm` and `dmenu`, **xwm** is designed to run efficiently on constra
 
 ### Key Features
 
-- **Single Visible Client**: Only one window is shown at a time; all others are hidden.
+- **Single Visible Client**: Only one window is shown at a time; all others are hidden (Except for floating/dialog windows which are on top).
 - **Integrated App Launcher**: A scrollable and clickable launcher (built on `dmenu`) replaces traditional typing-based app search.
 - **Process and Application View**: The launcher can display both installed applications and currently running processes.
-- **Touch Device Support**: Designed to work with on-screen keyboards and limited input; will support special client handling (e.g., `svkbd`) using concepts from the [sxmo project](https://sxmo.org) and `dwm`'s dock patch.
+- **Touch Device Support**: Designed to work with on-screen keyboards and limited input
 
-This project extends the simplicity of `dwm` and `dmenu` to deliver a clean, distraction-free windowing model with touch compatibility.
-
-## Current Project Status & Notes
-The next todo is to make the menu clickable, then add the keyboard, then gesture support.  
-
-Generally speaking these are the changes so far to dwm: 
-* Added: 
-	* Visibility for non-floating windows is defined as being the top client in the stack
-	* Socket server 
-		* serves the client stack 
-		* accepts request for a change in client selection
-		* these endpoints are used to enable app switching with dmenu
-	* Default behavior is monocle, while still permitting floating windows
-	* menu is now a window, list is size of window
-* Removed: 
-	* Multi-monitor support
-	* Tags
-	* Tile layout
-	* Fullscreen (technically. in practice monocle is essentially fullscreen.)
-	* Layout indicator in bar
-
-I'm removing features partly as an exercise, but it has the benefit of reducing complexity, and certain features are incompatible with the new (simpler) program architecture.  
-
-dwm 2165 / wm 1582 SLOC  
-dmenu 796 / menu 665 SLOC 
+This project extends the simplicity of `dwm`, `dmenu`, and `svkbd` to deliver a clean, distraction-free windowing model with touch compatibility.
 
 #### wm
 
@@ -54,8 +30,6 @@ dmenu 796 / menu 665 SLOC
 
  Each child of the root window is called a client, except windows which have
  set the override_redirect flag. Clients are organized in a linked client list.  
-
- Keys rules are organized as arrays and defined in config.h.  
 
 ## Requirements
 
@@ -84,17 +58,26 @@ exec wm
 
 ## Usage
 
-These shortcuts are modifiable in wm.h but below outlines the defaults.  
-The window manager uses `Alt` (`Mod1`) as the primary modifier key:
+These controls are modifiable in wm.h but below outlines the defaults.  
+By default the window manager uses `Alt` (`Mod1`) as the primary modifier key.  
 
-- `` Alt + f `` — Launch application launcher (`launch_app`)
-- `` Alt + j `` — Switch to a different application (`switch_app`)
-- `` Alt + Enter `` — Launch terminal (`uxterm`)
-- `` Alt + b `` — Toggle the visibility of the status bar
-- `` Alt + Shift + c `` — Close the focused window
-- `` Alt + Shift + q `` — Quit the window manager
+#### Keyboard Shortcuts
 
-### Screenshots
+- `` Alt + F `` → Launch app
+- `` Alt + J `` → Switch app
+- `` Alt + D `` → Toggle the status bar
+- `` Alt + K `` → Toggle the keyboard
+- `` Alt + Shift + J `` → Quit the focused window
+- `` Alt + Shift + F `` → Quit the window manager
+
+#### Mouse Buttons (while holding Alt):  
+Moving and resizing windows is only valid on floating windows.  
+
+- ``[ Left Click  ]`` → Move window  
+- ``[ Middle Click]`` → Toggle floating  
+- ``[ Right Click ]`` → Resize window  
+
+## Screenshots
 #### App Launcher
 ![launch_app](https://github.com/trent234/xwm/assets/22989914/1d087cd8-7fc9-4022-b0a4-4ed7c619f864)
 

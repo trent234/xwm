@@ -40,7 +40,7 @@
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel }; /* color schemes */
 enum { NetSupported, NetWMName, NetWMState, NetWMCheck,NetActiveWindow, NetWMWindowType,
-	   NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
+	   NetWMWindowTypeDialog, NetWMWindowTypeDock, NetClientList, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkStatusText, ClkWinTitle, ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
 enum {GetClients, SelectClient, StateDump, Quit}; /* socket commands */
@@ -88,6 +88,7 @@ struct Monitor {
 	int showbar;
 	Client *clients;
 	Window barwin;
+	Window kbwin;
 };
 
 /* function declarations */
@@ -110,15 +111,17 @@ static void expose(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static Atom getatomprop(Client *c, Atom prop);
-static char* getclients(char *unused); 
+static char* getclients(char *unused);
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
+static Atom getwindowtype(Window w);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
 static void manage(Window w, XWindowAttributes *wa);
+static void managedock(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
 static void movemouse(const Arg *arg);
@@ -251,6 +254,18 @@ arrange()
 	restack();
 
 	while (XCheckMaskEvent(dpy, EnterWindowMask, &ev));
+}
+ 
+void 
+managedock(Window w, XWindowAttributes *wa) {
+	/* Store the dock window (keyboard) in the monitor */
+	mon.kbwin = w;
+	/* Map the dock window */
+	XMapWindow(dpy, w);
+	/* Place the dock at the bottom of the screen, using its height from wa */
+	XMoveResizeWindow(dpy, w, mon.wx, mon.my + mon.mh - wa->height, mon.ww, wa->height);
+	/* Shrink the monitor's available window height to account for the dock */
+	mon.wh -= wa->height;
 }
 
 void
@@ -757,6 +772,21 @@ gettextprop(Window w, Atom atom, char *text, unsigned int size)
 	return 1;
 }
 
+/* getwindowtype() - An EWMH-compliant helper that retrieves the _NET_WM_WINDOW_TYPE property of a window */
+Atom 
+getwindowtype(Window w) {
+	Atom type = None;
+	int di;
+	unsigned long dl;
+	unsigned char *p = NULL;
+	if (XGetWindowProperty(dpy, w, netatom[NetWMWindowType], 0L, 1L, False, XA_ATOM,
+	    &type, &di, &dl, &dl, &p) == Success && p) {
+		type = *(Atom *)p;
+		XFree(p);
+	}
+	return type;
+}
+
 /*
  * grabbuttons() - Sets up mouse button event grabs for the client window.
  * This function is critical in ensuring that all mouse interactions on a client
@@ -937,8 +967,14 @@ maprequest(XEvent *e)
 
 	if (!XGetWindowAttributes(dpy, ev->window, &wa) || wa.override_redirect)
 		return;
-	if (!wintoclient(ev->window))
-		manage(ev->window, &wa);
+	if (!wintoclient(ev->window)) {
+		if (getwindowtype(ev->window) == netatom[NetWMWindowTypeDock]) {
+			managedock(ev->window, &wa);
+			arrange();
+		}
+		else
+			manage(ev->window, &wa);
+	}
 }
 
 void
@@ -1156,6 +1192,8 @@ restack(void)
 	wc.sibling = mon.barwin;
 	/* Iterate over sorted client list, configuring windows in order */
 	for (c = mon.clients; c; c = c->next) {
+		if (!c->isfloating)
+			resize(c, mon.wx, mon.wy, mon.ww, mon.wh);
 		XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
 		wc.sibling = c->win;
 	}
@@ -1362,6 +1400,7 @@ setup(void)
 	netatom[NetWMCheck] = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
 	netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
+	netatom[NetWMWindowTypeDock] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DOCK", False);
 	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	/* init cursors */
 	cursor[CurNormal] = drw_cur_create(drw, XC_left_ptr);
@@ -1508,10 +1547,6 @@ togglebar(const Arg *arg)
 	mon.showbar = !mon.showbar;
 	updatebarpos();
 	XMoveResizeWindow(dpy, mon.barwin, mon.wx, mon.by, mon.ww, bh);
-	for (Client *c = mon.clients; c; c = c->next) {
-		if (!c->isfloating)
-			resize(c, mon.wx, mon.wy, mon.ww, mon.wh);
-	}
 	arrange();
 }
 
@@ -1597,6 +1632,10 @@ unmapnotify(XEvent *e)
 			setclientstate(c, WithdrawnState);
 		else
 			unmanage(c, 0);
+	} else if (ev->window == mon.kbwin) {
+		mon.kbwin = 0;
+		mon.wh = mon.mh - (mon.showbar ? bh : 0);
+		arrange();
 	}
 }
 
