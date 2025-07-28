@@ -33,9 +33,9 @@ This project extends the simplicity of `dwm`, `dmenu`, and `svkbd` to deliver a 
 
 ## Requirements
 
-In order to build you need the Xlib header files e.g-  
+In order to build you need some Xlib dependencies e.g-  
 ```
-sudo apt install libx11-dev
+sudo apt install libx11-dev libxft-dev libxtst-dev
 ```
 
 ## Installation
